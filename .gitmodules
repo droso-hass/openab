@@ -1,0 +1,3 @@
+[submodule "firmware/v2/mtl_linux"]
+	path = firmware/v2/mtl_linux
+	url = https://github.com/RedoXyde/mtl_linux
