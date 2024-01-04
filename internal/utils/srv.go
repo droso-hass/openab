@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -34,8 +35,9 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, payload interface{})
 func SendFile(w http.ResponseWriter, r *http.Request, path string, contentType string) {
 	w.Header().Set("Content-Type", contentType)
 	data, err := os.ReadFile(path)
-	if IfError(w, r, err) {
-		return
+	if err != nil {
+		render.Status(r, 404)
+		slog.Error("error reading file", "path", path)
 	}
 	w.Write(data)
 }
