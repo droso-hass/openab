@@ -24,8 +24,8 @@ class DomainName(str):
         return DomainName(item + '.' + self)
 
 
-D = DomainName('example.com.')
-IP = '127.0.0.1'
+D = DomainName('dev.nab.lan.')
+IP = '192.168.1.21'
 TTL = 60 * 5
 
 soa_record = SOA(
