@@ -1,0 +1,31 @@
+// --------------- net HOOK debut
+
+fun net src mac=
+	Secho "n ";//MACecho mac 0 1;
+//	dump src;
+	let strget src 7 -> p in
+	(
+		if p==6 then cbnetarp src mac // ARP
+		else if p==0 then
+			let strget src 17 -> ip in
+			if ip==6 then cbnettcp src mac
+			else if ip==17 then cbnetudp src mac;
+		0
+	);
+	// droso comment
+	// buttoncheckevent;
+	0;;
+
+fun netstart=
+	netCb #net;
+	resetarp;
+	resettcp;
+	resetudp;
+	0;;
+
+fun nettime=
+	arptime;
+	tcptime;
+	0;;
+
+// --------------- net HOOK fin

@@ -1,0 +1,161 @@
+//------------------- HTTP
+var HTTP_NORMAL=0;;
+var HTTP_STREAM=1;;
+var HTTP_DIRECT=2;;
+
+var HTTP_SOLVE=0;;
+var HTTP_REACH=1;;
+var HTTP_CONNECTED=2;;
+
+var lasthttpevent;;
+
+// type Httpreq contenant l'�tat d'une requ�te
+type Httpreq=[cnxH inputH outputH indexH cbH typeH stateH aliveH];;
+
+// callback de lecture sur la socket d'une requ�te
+fun tcpread cnx input httpreq=
+	if input==nil ||0==strlen input then	// erreur ou fin
+	(	closetcp cnx;	// on ferme la socket
+		if httpreq.typeH==HTTP_NORMAL then call httpreq.cbH [httpreq strcatlist rev httpreq.inputH nil]	// on retourne ce qui a �t� re�u
+		else call httpreq.cbH [httpreq nil]
+	)
+	else
+	(
+//		dump input;
+		set lasthttpevent=time;
+		set httpreq.aliveH=time_ms;
+		if httpreq.typeH==HTTP_NORMAL then set httpreq.inputH=input::httpreq.inputH	// on bufferise ce qui a �t� re�u
+		else if httpreq.typeH==HTTP_DIRECT then
+		(
+			call httpreq.cbH [httpreq input];
+			nil
+		)
+		else let strcat hd httpreq.inputH input -> s in
+		let strstr s "\13\10\13\10" 0 -> i in
+		if i==nil then
+		(
+			set httpreq.inputH=s::nil
+		)
+		else
+		(
+			set httpreq.inputH=nil;
+			set httpreq.typeH=HTTP_DIRECT;
+			call httpreq.cbH [httpreq strsub s 0 i];
+			if i+4<strlen s then call httpreq.cbH [httpreq strsub s i+4 nil];
+			nil
+		);
+		nil
+	);;
+
+// callback d'�criture sur la socket d'une requ�te
+fun tcpwrite cnx httpreq=
+	set httpreq.stateH=HTTP_CONNECTED; 
+	set httpreq.aliveH=time_ms;	
+	if httpreq.outputH!=nil then	// s'il y a des choses � envoyer (notamment la premi�re fois)
+	(
+		set httpreq.indexH=writetcp cnx httpreq.outputH httpreq.indexH;	// envoyer ce qui peut l'�tre
+		if httpreq.indexH==nil then	// si erreur lors de l'envoi
+		(	closetcp cnx;	// on ferme la socket
+			call httpreq.cbH [httpreq nil]	)	// on retourne nil
+		else if httpreq.indexH>=strlen httpreq.outputH then	// sinon si tout a �t� envoy�
+		(	set httpreq.indexH=nil;	// purger les donn�es d'�mission
+			set httpreq.outputH=nil;
+			nil
+		)
+	);;
+
+var http_prefurl="http://";;	// en-t�te normal (mais ici facultatif) d'une requ�te http
+
+fun isip s i=
+	if i>=strlen s then 1
+	else let strget s i -> c in
+	if (c<'0' || c>'9')&&c!='.' then 0
+	else isip s i+1;;
+
+
+// d�couper une url en [host port path].
+// host est de la forme ip:port
+// path ne commence pas par /
+fun cuturl url =
+	if !strcmp (strsub url 0 strlen http_prefurl) http_prefurl then cuturl strsub url strlen http_prefurl strlen url
+	else let strstr url "/" 0 -> i in
+		let if i==nil then url else strsub url 0 i -> addr in
+		let strstr addr ":" 0 -> j in
+		let if j==nil then [addr 80]
+			else [strsub addr 0 j atoi strsub addr j+1 strlen addr] -> [host port] in
+		let if i==nil then "/" else strsub url i strlen url -> path in
+		[host port path];;
+
+fun tcpevent t val msg sock=
+	if val==TCPWRITE then tcpwrite t sock
+	else if val==TCPCLOSE then tcpread t nil sock
+	else tcpread t msg sock;
+	0;;
+
+
+fun httpsendreq ip x=
+	Secho "found ip>>>>>>>>>>>>>>>>>>>>>>>>>"; Secholn ip;
+	let x->[port httpreq] in
+	if ip==nil then (call httpreq.cbH [httpreq nil]; nil)
+	else
+	(
+		set httpreq.cnxH=opentcp netip nil useparamip ip port fixarg4 #tcpevent httpreq;
+		set httpreq.stateH=HTTP_REACH;
+		nil
+	);
+	0;;
+
+
+//##> cr�ation d'une requ�te http
+// param�tres : verb=verbe de la requ�te url=url de la requ�te postdata=donn�es suppl�mentaires (nil si aucune) cb=callback de retour
+fun httprequest verb url postdata cb type=
+//	Secho "HTTPREQUEST url =";Secholn url;
+	let cuturl url ->[host port path] in	// d�codage de l'url de la requ�te
+	let if confGetProxy then strcatlist "http://"::host::":"::(itoa port)::path::nil else path -> path in //Icy-MetaData:1\13\n
+	let strcatlist verb::" "::path::" HTTP/1.0\13\nUser-Agent: MTL\13\nPragma: no-cache\13\nIcy-MetaData:1\13\nHost: "::host::"\13\n"::
+			if postdata==nil then "\13\n"::nil
+			else "Content-length: "::(itoa strlen postdata)::"\13\n\13\n"::postdata::nil
+		-> request in	// cr�ation de la cha�ne requ�te
+	let if confGetProxy then webip confGetProxyip else host -> host in
+	let if confGetProxy then confGetProxyport else port -> port in
+	let [outputH:request indexH:0 cbH:cb typeH:type stateH:HTTP_SOLVE aliveH:time_ms] -> httpreq in	// cr�ation de la structure requ�te
+	(
+//		Secho "HTTPREQUEST host =";Secholn host;
+		if isip host 0 then httpsendreq host [port httpreq]
+		else
+		(
+			dnsreq host fixarg2 #httpsendreq [port httpreq];
+			nil
+		);
+		httpreq	// on retourne la structure requ�te pour pouvoir �ventuellement l'interrompre en cours de route
+	);;
+
+//##> interruption d'une requ�te en cours
+fun httpabort httpreq=
+	closetcp httpreq.cnxH;;	// on ferme la socket de la requ�te
+
+fun httpenable httpreq v=
+	enabletcp httpreq.cnxH v;;
+
+fun httpstate httpreq = httpreq.stateH;;
+
+fun httpinactive httpreq = time_ms-httpreq.aliveH;;
+
+
+var http_sep="\13\n\13\n";;	// s�parateur entre l'en-t�te et le corps de la r�ponse � une requ�te
+
+	
+
+//##> retourne le header d'une r�ponse � une requ�te
+fun httpgetheader res =
+	let strstr res http_sep 0 -> i in
+	if i==nil then res
+	else strsub res 0 i+strlen http_sep;;
+
+//##> retourne le contenu d'une r�ponse � une requ�te (sans header)
+fun httpgetcontent res =
+	let strstr res http_sep 0 -> i in
+	if i==nil then nil
+	else strsub res i+strlen http_sep strlen res;;
+
+//-------------------

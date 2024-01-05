@@ -1,0 +1,856 @@
+
+
+//------------ BEGIN ./main.mtl ------------
+proto main 0;;
+
+var SIMU;;
+var NOMINAL;;
+
+
+
+//------------ BEGIN ./lib/std/utils.mtl ------------
+// --------------- UTIL debut
+//fun strcmp a b = vstrcmp a 0 b 0 nil;;
+fun strstr s p i=strfind s i p 0 nil;;
+fun itoanil l=if l==nil then '0'::nil else l;;
+fun listlen l=if l==nil then 0 else 1+listlen tl l;;
+fun listrem l x=if l!=nil then if x==hd l then tl l else (hd l)::listrem tl l x;;
+fun slistlen l=	if l==nil then 0 else (strlen hd l)+slistlen tl l;;
+fun listnth l i=if !i then hd l else if i>0 then listnth tl l i-1;;
+
+fun listtostr l=
+	let strnew listlen l -> s in
+	let 0->i in
+	(
+		for p=l;p!=nil;tl p do
+		(
+			strset s i hd p;
+			set i=i+1
+		);
+	s
+	);;
+
+fun atoibin2 val=itobin2 atoi val;;
+
+fun countpattern s p i=
+	let strstr s p i -> j in
+	if j==nil then 0
+	else 1+countpattern s p j+strlen p;;
+
+fun strreplace2 sn s p v i id=
+	if i<strlen s then
+	let strstr s p i -> j in
+	let if j==nil then strlen s else j -> k in
+	(
+		strcpy sn id s i k-i;
+		if j!=nil then strcpy sn id+k-i v 0 nil;
+		strreplace2 sn s p v k+strlen p id+k-i+strlen v
+	);;
+	
+fun strreplace s p v=
+	let countpattern s p 0 -> i in
+	if !i then s
+	else let strnew (strlen s) + ((strlen v)-(strlen p))*i -> sn in
+	(
+		strreplace2 sn s p v 0 0;
+		sn
+	);;
+
+
+fun rev p q=if p==nil then q else rev tl p (hd p)::q;;
+
+fun remfromlist l t= if l!=nil then if t==hd l then tl l else (hd l)::remfromlist tl l t;;
+
+fun insert x l f=
+	if l==nil then x::nil
+	else let call f [x hd l] -> r in
+	if r>0 then (hd l)::insert x tl l f
+	else if r<0 then x::l
+	else insert x tl l f;;
+
+fun sort l f= if l!=nil then insert hd l sort tl l f f;;
+
+fun select l a f= if l!=nil then let hd l-> x in if call f [x a] then x::select tl l a f else select tl l a f;;
+
+fun conc p q=if p==nil then q else (hd p)::conc tl p q;;
+
+fun _useparamip s i val j=
+	if i<4 then
+	let strstr val "." j -> k in
+	(
+		strset s i atoi strsub val j if k==nil then nil else k-j;
+		_useparamip s i+1 val if k==nil then strlen val else k+1
+	);;
+
+fun useparamip val=
+	let strnew 4 -> ip in
+	(
+		_useparamip ip 0 val 0;
+		ip
+	);;
+
+fun webip ip=
+	strcatlist (itoa strget ip 0)::"."::(itoa strget ip 1)::"."::(itoa strget ip 2)::"."::(itoa strget ip 3)::nil;;
+
+fun _webmac key i=
+	if i<strlen key then (ctoh strget key i)::if i+1<strlen key then ":"::_webmac key i+1 else _webmac key i+1;;
+
+fun webmac key=strcatlist _webmac key 0;;
+
+// proto setleds 1;;
+
+// ---------------- UTIL fin
+
+//------------ END ./lib/std/utils.mtl ------------
+
+
+//------------ BEGIN ./lib/std/debug.mtl ------------
+
+
+fun MACecho src i0 ln=
+	for i=0;i<6 do (Secho ctoh strget src i0+i; Secho ".");	if ln then Secholn "";
+	src;;
+
+fun SEQecho src i0 ln=
+	for i=0;i<4 do (Secho ctoh strget src i0+i; Secho ".");	if ln then Secholn "";
+	src;;
+
+fun IPecho src i0 ln=
+	for i=0;i<4 do (Iecho strget src i0+i; Secho ".");if ln then Secholn "";
+	src;;
+
+fun itoh4 i = strcatlist (ctoh i>>24)::(ctoh i>>16)::(ctoh i>>8)::(ctoh i)::nil;;
+
+fun dump s=
+	for i0=0;i0<strlen s;i0+16 do
+	(
+		Secho itoh4 i0;
+		Secho " ";
+		for i=0;i<16 do let strget s i0+i -> c in
+		(
+			Secho if c==nil then "  " else ctoh c;
+			Secho " "
+		);
+		Secho " ";
+		for i=0;i<16 do let strget s i0+i -> c in
+		(
+			Secho if c==nil then "  " else if c<32 then "." else ctoa c
+		);
+		Secholn ""
+	);
+
+	s;;
+
+fun dumpscan l0=
+	Secholn "## DUMPSCAN >>>>";
+	for l=l0;l!=nil;tl l do
+	let hd l->[ssid mac bssid rssi channel rateset encryption] in
+	(
+		Secho "## SCAN "; Secholn ssid;
+		Secho "mac:"; MACecho mac 0 1;
+		Secho "bssid:"; MACecho bssid 0 1;
+		Secho "rssi:"; Iecholn rssi;
+		Secho "channel:"; Iecholn channel;
+		Secho "rateset:"; Iecholn rateset;
+		Secho "encryption:"; Iecholn encryption
+	);
+	l0;;
+
+//------------ END ./lib/std/debug.mtl ------------
+
+
+//------------ BEGIN ./lib/const/config.mtl ------------
+
+ifdef NOMINAL
+{
+var AUDIOLIB;;
+var EARSLIB;;
+var INFOLIB;;
+var RECLIB;;
+}
+
+ifdef SIMU
+{
+var HARDWARE=4;;
+var DNSLOCAL=999;;
+}
+else
+{
+var HARDWARE=4;;
+var DNSLOCAL=1597;;
+}
+
+// proto buttoncheckevent 0;;
+
+
+
+type Wifi=initW | gomasterW | masterW | gostationW _ | dhcpW _| stationW | reconnectW;;
+var wifi;;
+
+var netip="\0\0\0\0";;
+var netmask="\255\255\255\0";;
+var netgateway="\0\0\0\0";;
+var netdns="\0\0\0\0";;
+
+var mymac;;
+
+var macbroadcast="\$ff\$ff\$ff\$ff\$ff\$ff";;
+var ipbroadcast="\$ff\$ff\$ff\$ff";;
+
+var master=0;;
+
+var netip_empty="\0\0\0\0";;
+
+var netip_master="\192\168\2\1";;
+var netmask_master="\255\255\255\0";;
+var netgateway_master="\192\168\0\1";;
+
+var wifiscans;;
+
+var IEEE80211_CRYPT_NONE=0;;
+var IEEE80211_CRYPT_WEP64=1;;
+var IEEE80211_CRYPT_WEP128=2;;
+var IEEE80211_CRYPT_WPA=3;;
+var IEEE80211_CRYPT_WPA_UNSUPPORTED=4;;
+
+var IEEE80211_AUTH_OPEN=0;;
+var IEEE80211_AUTH_SHARED=1;;
+
+var FIRMWARE=0x01010f;;
+
+
+var RT2501_S_BROKEN=0;;
+var RT2501_S_IDLE=1;;
+var RT2501_S_SCAN=2;;
+var RT2501_S_CONNECTING=3;;
+var RT2501_S_CONNECTED=4;;
+var RT2501_S_MASTER=5;;
+
+var IEEE80211_M_MANAGED=0;;
+var IEEE80211_M_MASTER=1;;
+
+
+// ------------- Config debut
+var CONF_SERVERURL=0;;		//41
+var CONF_NETDHCP=41;;		//1
+var CONF_NETIP=42;;			//4
+var CONF_NETMASK=46;;		//4
+var CONF_NETGATEWAY=50;;	//4
+var CONF_NETDNS=54;;		//4
+var CONF_WIFISSID=58;;		//32
+var CONF_WIFIAUTH=90;;		//1
+var CONF_WIFICRYPT=91;;		//1
+var CONF_WIFIKEY0=92;;		//64
+var CONF_PROXYENABLE=156;;	//1
+var CONF_PROXYIP=157;;		//4
+var CONF_PROXYPORT=161;;	//2
+var CONF_LOGIN=163;;		//6
+var CONF_PWD=169;;			//6
+var CONF_WIFIPMK=175;;		//32
+var CONF_MAGIC=207;;		//1
+var CONF_LENGTH=208;;
+
+var conf;;
+
+/*
+var conf0=
+"r.nabaztag.com/vl\0-----------------------\
+\1\0\0\0\0\255\255\255\0\0\0\0\0\0\0\0\0\
+\0-------------------------------\
+\0\0abcde\0----------------------------------------------------------\
+\0\0\0\0\0\0\0\
+\0\0\0\0\0\0\
+\0\0\0\0\0\0\
+--------------------------------\
+\$48";;
+*/
+
+fun confSave=
+	Secholn "## save configuration";
+	dump conf;
+	save conf 0 "conf.bin" 0 CONF_LENGTH;;
+
+fun confInit=
+	set conf=strnew CONF_LENGTH;
+	load conf 0 "conf.bin" 0 CONF_LENGTH;
+/*	if (strget conf CONF_MAGIC)!=0x48 then
+	(
+		set conf=strnew CONF_LENGTH;
+		strcpy conf 0 conf0 0 nil;
+		confSave;
+		set conf=strnew CONF_LENGTH;
+		load conf 0 "conf.bin" 0 CONF_LENGTH
+	);
+*/	dump conf;;
+
+fun confGet i len= strsub conf i len;;
+
+fun confGetbin i len= strsub conf i len;;
+
+fun confGetstr i len=
+	let strstr conf "\0" i -> j in
+	strsub conf i (if j==nil then len else min len j-i);;
+
+fun confSet i val len=
+	strcpy conf i val 0 len;;
+
+fun confSetbin i val len=strcpy conf i val 0 len;;
+
+fun confSetstr i val len=
+	let min strlen val len-1 -> len in
+	(
+		strcpy conf i val 0 len;
+		strset conf i+len 0
+	);;
+
+fun webport s= ((strget s 0)<<8)+strget s 1;;
+
+fun confGetWifissid=confGetstr CONF_WIFISSID 32;;
+fun confGetWificrypt=strget confGet CONF_WIFICRYPT 1 0;;
+fun confGetWifikey0=confGetstr CONF_WIFIKEY0 64;;
+fun confGetWifiauth=strget confGet CONF_WIFIAUTH 1 0;;
+fun confGetWifipmk=confGetbin CONF_WIFIPMK 32;;
+
+fun confGetDhcp=strget confGet CONF_NETDHCP 1 0;;
+fun confGetNetip=confGet CONF_NETIP 4;;
+fun confGetNetmask=confGet CONF_NETMASK 4;;
+fun confGetNetgateway=confGet CONF_NETGATEWAY 4;;
+fun confGetNetdns=confGet CONF_NETDNS 4;;
+
+fun confGetServerUrl=confGetstr CONF_SERVERURL 40;;
+fun confGetLogin=confGet CONF_LOGIN 6;;
+fun confGetPwd=confGet CONF_PWD 6;;
+
+fun confGetProxy=strget confGet CONF_PROXYENABLE 1 0;;
+fun confGetProxyip=confGet CONF_PROXYIP 4;;
+fun confGetProxyport=webport confGet CONF_PROXYPORT 2;;
+
+// ------------- Config fin
+
+
+
+//------------ END ./lib/const/config.mtl ------------
+
+
+//------------ BEGIN ./lib/net/simu.mtl ------------
+
+// real
+//#include arp.mtl
+//#include ip.mtl
+//#include tcp.mtl
+//#include udp.mtl
+//#include dhcp.mtl
+//#include net.mtl
+//#include dns.mtl
+//#include http.mtl
+
+// --------------- TCP/UDP EMULATION debut
+
+var TCPWRITE=0;;
+var TCPREAD=1;;
+var TCPCLOSE=-1;;
+var TCPSTART=2;;
+
+fun udpsend local localp dst dstp content mac=
+	udpSend localp dst dstp content 0 nil;;
+
+var ludp;;
+
+fun regudp port cb=
+	set ludp=[udpStart port cb]::ludp;;
+
+fun resetudp=set ludp=nil;;
+
+
+fun netudp t src ip=
+	let listswitch ludp t -> cb in
+	call cb [src nil ip];;
+
+var ltcp;;
+
+fun writetcp t msg i=
+	tcpSend t msg i nil;;
+
+fun remtcp l t= if l!=nil then let hd l->[tt _] in if t==tt then tl l
+	else (hd l)::remtcp tl l t;;
+
+fun updatetcp l t cb= if l!=nil then let hd l->[tt _] in if t==tt then [t cb]::tl l
+	else (hd l)::updatetcp tl l t cb;;
+
+fun closetcp t=
+	set ltcp=remtcp ltcp t;
+	tcpClose t;;
+
+fun tcpcb t cb=
+	set ltcp=updatetcp ltcp t cb;
+	cb;;
+
+fun listentcp port cb=
+	set ltcp=[tcpListen port cb]::ltcp;;
+
+
+fun opentcp local localp dst dstp cb=
+//	Secholn "opentcp";IPecho dst 0 0; Secho ":"; Iecholn dstp;
+
+	let tcpOpen dst dstp -> t in
+	if t!=nil then
+	(
+		set ltcp=[t cb]::ltcp;
+		t
+	);;
+
+fun enabletcp t v=
+	tcpEnable t v;;
+
+fun nettcp t val msg=
+	if val==TCPSTART then
+		let listswitch ltcp atoi msg -> cb in
+		(
+			if cb==nil then Secholn "callback is nil"
+			else Secholn "callback is not nil";
+			set ltcp=[t cb]::ltcp;
+			call cb [t val msg]
+		)
+	else let listswitch ltcp t -> cb in
+		call cb [t val msg];;
+
+fun startdhcp=0;;
+fun startdhcpserver=0;;
+
+fun nettime=0;;
+
+fun netstart=
+	tcpCb #nettcp;
+	udpCb #netudp;
+	set ltcp=nil;
+	set ludp=nil;
+//	set wifi=stationW;
+	set netdns=confGetNetdns;
+	set netdns="\192\168\1\1";
+//	set netdns="\10\0\1\1";
+	set netip="\127\0\0\1";
+	0;;
+// --------------- TCP/UDP EMULATION fin
+
+
+// simu
+
+
+//------------ BEGIN ./lib/net/dhcp.mtl ------------
+// --------------- DHCP debut
+
+var DHCP_DISCOVER=1;;
+var DHCP_OFFER=2;;
+var DHCP_REQUEST=3;;
+var DHCP_DECLINE=4;;
+var DHCP_ACK=5;;
+
+fun mkdhcp op netip hostip newip =
+	let 236+16+14->n in
+	let strnew n -> b in
+	(
+		for i=0;i<n do strset b  i 0;
+		strcpy b 0 "\1\1\6" 0 3;
+		strcpy b 12 netip 0 4;
+		strcpy b 12+16 mymac 0 6;
+		strcpy b 236 "\99\130\83\99\53\1" 0 6;
+		strset b 236+6 op;
+		strcpy b 236+7 "\61\7\1" 0 3;
+		strcpy b 236+10 mymac 0 6;
+		strcpy b 236+16 "\12\7Pabcdef\55\3\1\3\6" 0 14;
+		if op==DHCP_REQUEST then strcatlist b::"\54\4"::hostip::"\50\4"::newip::"\255"::nil
+		else strcat b "\255"
+	);;
+
+fun mkdhcpans op tid newip dmac=
+	let 236+7->n in
+	let strnew n -> b in
+	(
+		for i=0;i<n do strset b  i 0;
+		strcpy b 0 "\2\1\6" 0 3;
+		strcpy b 4 tid 0 4;
+		strcpy b 16 newip 0 4;
+		strcpy b 12+16 dmac 0 6;
+		strcpy b 236 "\99\130\83\99\53\1" 0 6;
+		strset b 236+6 op;
+		strcatlist b::"\54\4"::newip::"\51\4\0\1\$51\$80\1\4"::netmask::"\3\4"::netip::"\6\4"::netip::"\15\4home\255"::nil
+	);;
+
+fun extractdhcp src i type lease submask dns gateway mac=
+	if i<strlen src then
+	let strget src i -> c in
+	if c==255 then [type lease submask dns gateway mac]
+	else let strget src i+1 -> len in
+	let i+2->i in
+	if c==53 then extractdhcp src i+len (strget src i) lease submask dns gateway mac
+	else if c==51 then extractdhcp src i+len type (strgetword src i) submask dns gateway mac
+	else if c==1 then extractdhcp src i+len type lease (strsub src i 4) dns gateway mac
+	else if c==6 then extractdhcp src i+len type lease submask (strsub src i 4) gateway mac
+	else if c==3 then extractdhcp src i+len type lease submask dns (strsub src i 4) mac
+	else if c==61 then extractdhcp src i+len type lease submask dns gateway (strsub src i+1 6)
+	else extractdhcp src i+len type lease submask dns gateway mac;;
+
+fun mkdhcpip mac=
+	let strnew 4 -> s in
+	(
+		strcpy s 0 netip 0 4;
+		strset s 3 ((strget mac 5)&0x7f)+100;
+		s
+	);;
+
+fun cbnetdhcp src macfrom hostip=
+	Secholn "<dhcp"; MACecho macfrom 0 1;
+	let strget src 0 -> x in
+	let MACecho (strsub src 28 6)0 1 -> mac in
+	if x==2 && !strcmp mac mymac then
+	(
+		let IPecho (strsub src 16 4) 0 1-> newip in
+		let extractdhcp src 240 0 nil nil nil nil nil->[type lease submask dns gateway _] in
+		if type==DHCP_OFFER then
+		(
+			Secholn ">>>>>>>>>>>>>>>OFFER";
+			udpsend netip 68 ipbroadcast 67 (mkdhcp DHCP_REQUEST netip hostip newip) macbroadcast;
+			nil
+		)
+		else if type==DHCP_ACK then
+		(
+			Secholn ">>>>>>>>>>>>>>>ACK";
+			Secho "server    ";IPecho hostip 0 1;
+			Secho "ip        ";IPecho set netip=newip 0 1;
+			Secho "type      ";Iecholn type;
+			Secho "leasetime ";Iecholn lease;
+			Secho "submask   ";IPecho set netmask=submask 0 1;
+			Secho "dns       ";IPecho set netdns=dns 0 1;
+			Secho "gateway   ";IPecho set netgateway=gateway 0 1;
+			nil
+		)
+	);;
+
+fun cbnetdhcp67 src macfrom hostip=
+	Secholn "<dhcp"; MACecho macfrom 0 1;
+	let strget src 0 -> x in
+	let MACecho (strsub src 28 6)0 1 -> mac in
+	if x==1 /*&& !strcmp mac mymac*/ then
+	(
+		let extractdhcp src 240 0 nil nil nil nil nil ->[type _ _ _ _ dmac] in
+		let strsub src 4 4 -> tid in
+		let mkdhcpip macfrom -> newip in
+		if type==DHCP_DISCOVER then
+		(
+			Secholn ">>>>>>>>>>>>>>>DISCOVER";
+//			dump src;
+			udpsend netip 67 ipbroadcast 68 (mkdhcpans DHCP_OFFER tid newip dmac) macbroadcast;
+			nil
+		)
+		else if type==DHCP_REQUEST then
+		(
+			Secholn ">>>>>>>>>>>>>>>REQUEST";
+//			dump src;
+			udpsend netip 67 ipbroadcast 68 (mkdhcpans DHCP_ACK tid newip dmac) macbroadcast;
+			nil
+		)
+
+	);;
+
+fun startdhcp=
+	udpsend netip 68 ipbroadcast 67 (mkdhcp DHCP_DISCOVER "\0\0\0\0" nil nil) macbroadcast;
+	regudp 68 #cbnetdhcp;
+	0;;
+
+fun startdhcpserver=
+	regudp 67 #cbnetdhcp67;
+	0;;
+
+// --------------- DHCP fin
+
+//------------ END ./lib/net/dhcp.mtl ------------
+
+
+//------------ BEGIN ./lib/net/dns.mtl ------------
+// --------------- DNS debut
+fun parsequ s i= let strfind s i "\0" 0 nil -> j in	j+5;;
+
+fun parsequs s i n=	if n<=0 then i else parsequs s parsequ s i n-1;;
+
+fun skipname s i=
+	let strgetword s i -> x in
+	if (x&0xc000)==0xc000 then i+2
+	else (strfind s i "\0" 0 nil)+1;;
+
+fun parseans s i n=
+	if n<=0 then nil
+	else let skipname s i -> j in
+	let strgetword s j -> typ in
+	if typ==1 then
+		strcatlist (itoa strget s j+10)::"."::(itoa strget s j+11)::"."::
+		(itoa strget s j+12)::"."::(itoa strget s j+13)::nil
+	else parseans s (j+10+strgetword s j+8) n-1;;
+	
+fun parsemsg s=
+	let strgetword s 0 -> id in
+	let strgetword s 2 -> code in
+	let strgetword s 4 -> nbqu in
+	let strgetword s 6 -> nbans in
+	if nbans==0 then nil
+	else let parsequs s 12 nbqu -> i in
+	parseans s i nbans;;
+
+fun filterdns src=
+	let strfind src 0 "." 0 nil ->i in
+	if i!=nil then
+		strcat
+			strcat ctoa i strsub src 0 i
+			filterdns strsub src i+1 nil
+	else strcat ctoa strlen src src;;
+
+fun question id dns=
+	strcatlist (itobin2 id)::"\$01\$00\$00\$01\$00\$00\$00\$00\$00\$00"::(filterdns dns)::"\$00\$00\$01\$00\$01"::nil;;
+
+var dnsid=0;;
+
+type Dns=[idD domainD reqD timeoutD cbD];;
+var ldnsreq;;
+var ldns;;
+
+fun dnsreq domain cb=
+	set dnsid=if dnsid==nil then time_ms else dnsid+1;
+	let listswitchstr ldns domain -> ip in
+	if ip!=nil then call cb[ip]
+	else let dump question dnsid domain -> tramedns in
+	(
+		udpsend netip DNSLOCAL netdns 53 tramedns nil;
+		set ldnsreq=[idD:dnsid domainD:domain reqD:tramedns timeoutD:time+5 cbD:cb]::ldnsreq;
+		nil
+	);
+	0;;
+
+fun selectbyid d v= d.idD==v;;
+
+fun cbnetdns msg mac ipfrom= 
+	let strgetword msg 0 -> id in
+	let parsemsg msg -> ip in
+	let hd select ldnsreq id #selectbyid -> x in
+	if x!=nil then
+	(
+		set ldnsreq=listrem ldnsreq x;
+		if ip!=nil then set ldns=[x.domainD ip]::ldns;	// ### attention � la taille de la liste
+		call x.cbD [ip]
+	);
+	0;;
+
+fun filterdnsdead l=if l!=nil then let hd l-> d in if d.timeoutD==nil then filterdnsdead tl l else (hd l)::filterdnsdead tl l;;
+
+fun dnstime=
+	for l=ldnsreq;l!=nil;tl l do let hd l-> d in
+	if time-d.timeoutD>=0 then
+	(
+		set d.timeoutD=nil;
+		call d.cbD [nil]
+	);
+	set ldnsreq=filterdnsdead ldnsreq;
+	0;;
+
+
+fun startdnsclient=
+	regudp DNSLOCAL #cbnetdns;
+	set ldnsreq=nil;
+	set ldns=nil;
+	0;;
+
+// --------------- DNS fin
+
+//------------ END ./lib/net/dns.mtl ------------
+
+
+//------------ BEGIN ./lib/net/http.mtl ------------
+//------------------- HTTP
+var HTTP_NORMAL=0;;
+var HTTP_STREAM=1;;
+var HTTP_DIRECT=2;;
+
+var HTTP_SOLVE=0;;
+var HTTP_REACH=1;;
+var HTTP_CONNECTED=2;;
+
+var lasthttpevent;;
+
+// type Httpreq contenant l'�tat d'une requ�te
+type Httpreq=[cnxH inputH outputH indexH cbH typeH stateH aliveH];;
+
+// callback de lecture sur la socket d'une requ�te
+fun tcpread cnx input httpreq=
+	if input==nil ||0==strlen input then	// erreur ou fin
+	(	closetcp cnx;	// on ferme la socket
+		if httpreq.typeH==HTTP_NORMAL then call httpreq.cbH [httpreq strcatlist rev httpreq.inputH nil]	// on retourne ce qui a �t� re�u
+		else call httpreq.cbH [httpreq nil]
+	)
+	else
+	(
+//		dump input;
+		set lasthttpevent=time;
+		set httpreq.aliveH=time_ms;
+		if httpreq.typeH==HTTP_NORMAL then set httpreq.inputH=input::httpreq.inputH	// on bufferise ce qui a �t� re�u
+		else if httpreq.typeH==HTTP_DIRECT then
+		(
+			call httpreq.cbH [httpreq input];
+			nil
+		)
+		else let strcat hd httpreq.inputH input -> s in
+		let strstr s "\13\10\13\10" 0 -> i in
+		if i==nil then
+		(
+			set httpreq.inputH=s::nil
+		)
+		else
+		(
+			set httpreq.inputH=nil;
+			set httpreq.typeH=HTTP_DIRECT;
+			call httpreq.cbH [httpreq strsub s 0 i];
+			if i+4<strlen s then call httpreq.cbH [httpreq strsub s i+4 nil];
+			nil
+		);
+		nil
+	);;
+
+// callback d'�criture sur la socket d'une requ�te
+fun tcpwrite cnx httpreq=
+	set httpreq.stateH=HTTP_CONNECTED; 
+	set httpreq.aliveH=time_ms;	
+	if httpreq.outputH!=nil then	// s'il y a des choses � envoyer (notamment la premi�re fois)
+	(
+		set httpreq.indexH=writetcp cnx httpreq.outputH httpreq.indexH;	// envoyer ce qui peut l'�tre
+		if httpreq.indexH==nil then	// si erreur lors de l'envoi
+		(	closetcp cnx;	// on ferme la socket
+			call httpreq.cbH [httpreq nil]	)	// on retourne nil
+		else if httpreq.indexH>=strlen httpreq.outputH then	// sinon si tout a �t� envoy�
+		(	set httpreq.indexH=nil;	// purger les donn�es d'�mission
+			set httpreq.outputH=nil;
+			nil
+		)
+	);;
+
+var http_prefurl="http://";;	// en-t�te normal (mais ici facultatif) d'une requ�te http
+
+fun isip s i=
+	if i>=strlen s then 1
+	else let strget s i -> c in
+	if (c<'0' || c>'9')&&c!='.' then 0
+	else isip s i+1;;
+
+
+// d�couper une url en [host port path].
+// host est de la forme ip:port
+// path ne commence pas par /
+fun cuturl url =
+	if !strcmp (strsub url 0 strlen http_prefurl) http_prefurl then cuturl strsub url strlen http_prefurl strlen url
+	else let strstr url "/" 0 -> i in
+		let if i==nil then url else strsub url 0 i -> addr in
+		let strstr addr ":" 0 -> j in
+		let if j==nil then [addr 80]
+			else [strsub addr 0 j atoi strsub addr j+1 strlen addr] -> [host port] in
+		let if i==nil then "/" else strsub url i strlen url -> path in
+		[host port path];;
+
+fun tcpevent t val msg sock=
+	if val==TCPWRITE then tcpwrite t sock
+	else if val==TCPCLOSE then tcpread t nil sock
+	else tcpread t msg sock;
+	0;;
+
+
+fun httpsendreq ip x=
+	Secho "found ip>>>>>>>>>>>>>>>>>>>>>>>>>"; Secholn ip;
+	let x->[port httpreq] in
+	if ip==nil then (call httpreq.cbH [httpreq nil]; nil)
+	else
+	(
+		set httpreq.cnxH=opentcp netip nil useparamip ip port fixarg4 #tcpevent httpreq;
+		set httpreq.stateH=HTTP_REACH;
+		nil
+	);
+	0;;
+
+
+//##> cr�ation d'une requ�te http
+// param�tres : verb=verbe de la requ�te url=url de la requ�te postdata=donn�es suppl�mentaires (nil si aucune) cb=callback de retour
+fun httprequest verb url postdata cb type=
+//	Secho "HTTPREQUEST url =";Secholn url;
+	let cuturl url ->[host port path] in	// d�codage de l'url de la requ�te
+	let if confGetProxy then strcatlist "http://"::host::":"::(itoa port)::path::nil else path -> path in //Icy-MetaData:1\13\n
+	let strcatlist verb::" "::path::" HTTP/1.0\13\nUser-Agent: MTL\13\nPragma: no-cache\13\nIcy-MetaData:1\13\nHost: "::host::"\13\n"::
+			if postdata==nil then "\13\n"::nil
+			else "Content-length: "::(itoa strlen postdata)::"\13\n\13\n"::postdata::nil
+		-> request in	// cr�ation de la cha�ne requ�te
+	let if confGetProxy then webip confGetProxyip else host -> host in
+	let if confGetProxy then confGetProxyport else port -> port in
+	let [outputH:request indexH:0 cbH:cb typeH:type stateH:HTTP_SOLVE aliveH:time_ms] -> httpreq in	// cr�ation de la structure requ�te
+	(
+//		Secho "HTTPREQUEST host =";Secholn host;
+		if isip host 0 then httpsendreq host [port httpreq]
+		else
+		(
+			dnsreq host fixarg2 #httpsendreq [port httpreq];
+			nil
+		);
+		httpreq	// on retourne la structure requ�te pour pouvoir �ventuellement l'interrompre en cours de route
+	);;
+
+//##> interruption d'une requ�te en cours
+fun httpabort httpreq=
+	closetcp httpreq.cnxH;;	// on ferme la socket de la requ�te
+
+fun httpenable httpreq v=
+	enabletcp httpreq.cnxH v;;
+
+fun httpstate httpreq = httpreq.stateH;;
+
+fun httpinactive httpreq = time_ms-httpreq.aliveH;;
+
+
+var http_sep="\13\n\13\n";;	// s�parateur entre l'en-t�te et le corps de la r�ponse � une requ�te
+
+	
+
+//##> retourne le header d'une r�ponse � une requ�te
+fun httpgetheader res =
+	let strstr res http_sep 0 -> i in
+	if i==nil then res
+	else strsub res 0 i+strlen http_sep;;
+
+//##> retourne le contenu d'une r�ponse � une requ�te (sans header)
+fun httpgetcontent res =
+	let strstr res http_sep 0 -> i in
+	if i==nil then nil
+	else strsub res i+strlen http_sep strlen res;;
+
+//-------------------
+
+//------------ END ./lib/net/http.mtl ------------
+
+//------------ END ./lib/net/simu.mtl ------------
+
+
+var pingurl = "http://192.168.1.132/vl/hello";;
+
+
+
+fun _pingcbhttp http res=
+	Secholn "ping=";
+    Secholn res;
+	0;;
+
+
+fun runpingstart=
+	httprequest "GET" Secholn pingurl nil #_pingcbhttp HTTP_NORMAL;
+	0;;
+
+fun main=
+    Secholn "starting";
+    confInit;
+    netstart;
+    startdnsclient;
+    runpingstart;
+    Secholn "hello world";
+    0;;
+
+//------------ END ./main.mtl ------------

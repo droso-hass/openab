@@ -1,0 +1,196 @@
+ifdef AUDIOLIB {
+
+var WAV_IDLE=0;;
+var WAV_RUN=1;;
+var WAV_EOF=2;;
+
+var WAV_BUFFER_STARTSIZE=80000;;
+var WAV_BUFFER_MAXSIZE=400000;;
+
+var WAV_END_TIMEOUT=500;;
+var WAV_NET_TIMEOUT=10000;;
+
+var wav_end_timeout;;
+
+var wav_state=0;;
+var wav_http;;
+var wav_fifo;;
+var wav_buffering;;
+var wav_index;;
+var wav_lasttime;;
+var wav_lastnet;;
+var wav_zeros;;
+
+var lastvol;;
+var forcedvol=0;;
+fun volfrombutton v=let 255-v -> v in 255-((v*v)>>8);;
+
+fun updatevol=
+	let button3 -> v in
+	if !forcedvol && v!=lastvol && (!recording) && (lastvol!=255 || v<250) then
+	(
+		set lastvol=v;
+		sndVol volfrombutton v
+	);;
+
+fun forcevol v=
+	sndVol volfrombutton (button3*v)>>8;
+	set forcedvol=1;
+	0;;
+fun unforcevol=
+	set forcedvol=0;
+	set lastvol=nil;
+	0;;
+
+fun wavgetzeros=
+	if wav_zeros==nil then
+	(
+		set wav_zeros=strnew 2048;
+		for i=0;i<2048 do strset wav_zeros i 0
+	);
+	wav_zeros;;
+
+fun wavstop =
+Secholn "###wavstop";
+	if wav_state!=WAV_IDLE then
+	(
+		playStop;
+		if wav_http!=nil then httpabort wav_http;
+		set wav_http=nil;
+		set wav_state=WAV_IDLE
+	);;
+
+fun wavrunning =
+	if wav_state==WAV_IDLE then 0
+	else if wav_fifo==nil && wav_state==WAV_EOF && (time_ms-wav_lasttime>wav_end_timeout) then
+	(
+Secholn "###wav detected end";
+		wavstop;
+		0
+	)
+	else if wav_lasttime==nil then -1 else 1;;
+
+fun _wavcb i =
+//Secho "p";
+	set wav_lasttime=time_ms;
+//	Iecho i;Secho ":cbplay\n";
+	if wav_fifo==nil then
+	(
+		if wav_state==WAV_EOF then playFeed nil nil nil
+		else
+		(
+				if !wav_buffering then Secholn ">>>>buffering...............";
+				set wav_buffering=1
+		)
+	)
+	else
+	(
+		if wav_buffering && (wav_state==WAV_EOF || (slistlen wav_fifo)>=WAV_BUFFER_STARTSIZE)
+			then set wav_buffering=0;
+		if !wav_buffering then let hd wav_fifo -> sample in
+		let strlen sample -> len in
+		(
+			if wav_index<len then 
+				set wav_index=wav_index+playFeed sample /*Iecho*/ wav_index nil;
+			if wav_index>=len then
+			(
+				set wav_index=0;
+				set wav_fifo=tl wav_fifo;
+				if wav_http!=nil then if (slistlen wav_fifo)<WAV_BUFFER_MAXSIZE then httpenable wav_http 1
+			)
+		)
+	);
+	0;;
+
+fun _wavstartnow =
+	set wav_index=0;
+	set wav_buffering=1;
+	playStart 1024 #_wavcb;;
+
+fun wavstartlocalEx l timeout=
+	wavstop;
+	set wav_end_timeout=timeout;
+	set wav_fifo=conc l (wavgetzeros)::nil;
+	set wav_state=WAV_EOF;
+	set wav_lasttime=time_ms;
+	set wav_http=nil;
+	_wavstartnow
+	;;
+
+fun wavstartlocal l=wavstartlocalEx l WAV_END_TIMEOUT;;
+/*
+fun itobin4 i=strcatlist (ctoa i)::(ctoa i>>8)::(ctoa i>>16)::(ctoa i>>24)::nil;;
+fun itobin2 i=strcatlist (ctoa i)::(ctoa i>>8)::nil;;
+
+fun mkwav freq channel bps=
+	let strcatlist 
+		"WAVEfmt "::(itobin4 0x12)::
+			(itobin2 1)::(itobin2 channel)::
+			(itobin4 freq)::(itobin4 freq*channel*bps/8)::
+			(itobin2 channel*bps/8)::(itobin4 bps)::
+		"data"::(itobin4 0)::nil -> c in
+	strcatlist "RIFF"::(itobin4 (strlen c))::c::nil;;
+*/
+
+fun _wavcbhttp httpreq req=
+	set wav_lastnet=time_ms;
+	if req==nil then
+	(
+		Secholn ">>>>>>>>>>>>>>>>>>>>>>>>>>>>><end of file";
+		set wav_state=WAV_EOF;
+		if wav_fifo!=nil then set wav_fifo=conc wav_fifo (wavgetzeros)::nil;
+		if wav_index==nil then
+		(
+			set wav_fifo=tl wav_fifo;
+			if wav_fifo==nil then wavstop
+			else _wavstartnow
+		);
+		0
+	)
+	else
+	(
+//		dump req;
+		set wav_fifo=conc wav_fifo req::nil;
+		let slistlen wav_fifo -> n in
+		if wav_index==nil && n>WAV_BUFFER_STARTSIZE then
+		(
+			set wav_fifo=tl wav_fifo;
+			_wavstartnow
+		)
+		else if n>WAV_BUFFER_MAXSIZE then
+		(
+			Secholn "\n>>>>>>>>>>>>>>http wait";
+			httpenable httpreq 0
+		);
+		nil
+	);
+	updatevol;
+	0;;
+
+fun wavstarthttp url =
+	wavstop;
+	set wav_end_timeout=WAV_END_TIMEOUT;
+	set wav_fifo=nil;
+	set wav_state=WAV_RUN;
+	set wav_index=nil;
+	set wav_buffering=1;
+	set wav_lasttime=nil;
+	set wav_lastnet=time_ms;
+	set wav_http=httprequest "GET" url nil #_wavcbhttp HTTP_STREAM;;
+
+fun wavtime =
+	if wav_http!=nil && wav_state==WAV_RUN && (time_ms-wav_lastnet>WAV_NET_TIMEOUT) then
+	(
+		if wav_http!=nil then
+		(
+			Secholn "####wavhttp abort";
+			httpabort wav_http;
+			set wav_http=nil;
+			_wavcbhttp wav_http nil;
+			0
+		)
+	);
+//	wavrunning;
+	0;;
+
+}

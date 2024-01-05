@@ -1,3 +1,5 @@
 config.yaml
 openab
 *.bin
+doc
+firmware/v2/ref

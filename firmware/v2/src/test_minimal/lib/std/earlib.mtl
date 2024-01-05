@@ -1,0 +1,234 @@
+
+ifdef EARSLIB {
+
+// ears management
+
+var EARSMODE_RESET=0;;
+var EARSMODE_WAIT=1;;
+var EARSMODE_WAITANDDETECT=2;;
+var EARSMODE_DETECT=3;;
+
+var EARS_HOLES=17;;
+var EARS_TIMEOUT=2000;;
+var EARS_OFFZERO=2;;
+
+type Ear=[numE dirE targetE posE lvalE ldelayE ltimeE countE brokenE];;
+
+var ears;;
+var earsmode;;
+var earslastmove;;	// somme des deux compteurs
+var earslastmovetime;;	// heure du dernier mouvement (=nil=> acquisition en cours)
+
+var earevent;;
+
+fun eargetevent=
+	let earevent -> ev in
+	(
+		set earevent=nil;
+		ev
+	);;
+
+fun earCheck v=
+	if v<0 then earCheck v+EARS_HOLES
+	else if v>=EARS_HOLES then earCheck v-EARS_HOLES
+	else v;;
+
+fun earMotorset e val=
+	set e.dirE=val;
+	motorset e.numE val;;
+
+fun earReset=
+Secholn "earReset";
+	set earsmode=EARSMODE_RESET;
+	for i=0;i<2 do let ears.i -> e in
+	(
+		earMotorset e 1;
+		set e.brokenE=0;
+		set e.targetE=nil;
+		set e.lvalE=motorget i;
+		set e.ldelayE=nil;
+		set e.ltimeE=time_ms
+	);;
+
+fun earInit =
+	set ears=tabnew nil 2;
+	for i=0;i<2 do set ears.i=[numE:i];
+	earReset;;
+
+
+fun earStartDetect=
+	setleds 0xff8000;
+	set earsmode=EARSMODE_DETECT;
+	set earslastmovetime=time_ms;
+	set earslastmove=(motorget 0)+(motorget 1);;
+
+
+fun earDetectRun=
+	if earslastmovetime!=nil then
+	(
+		let (motorget 0)+(motorget 1)->newval in
+		if newval!=earslastmove then
+		(
+			Secho "new val ";Iecholn newval;
+			set earslastmove=newval;
+			set earslastmovetime=time_ms
+		)
+		else if time_ms-earslastmovetime>EARS_TIMEOUT then
+		(
+			set earslastmovetime=nil;
+			for i=0;i<2 do let ears.i -> e in
+			if e.brokenE!=1 then
+			(
+				set e.lvalE=motorget i;
+				set e.ldelayE=0;
+				set e.ltimeE=time_ms;
+				earMotorset e 1;
+				set e.countE=e.lvalE+EARS_HOLES
+			)
+		)
+	)
+	else
+	(
+		for i=0;i<2 do let ears.i -> e in
+			if e.brokenE!=1 then
+			if e.dirE then
+			let motorget i -> v in
+			if v!=e.lvalE then
+				let time_ms -> t in
+				let t-e.ltimeE -> d in
+				(
+					if d>e.ldelayE then
+					(
+						set e.posE=earCheck e.countE-e.lvalE-EARS_OFFZERO-1;
+						set e.ldelayE=d
+					);
+					set e.ltimeE=t;
+					set e.lvalE=v;
+					if v-e.countE>=0 then earMotorset e 0
+				);
+		if (ears.(0).dirE)==0 && (ears.(1).dirE)==0 then
+		(
+			set earevent=0x8000+(ears.(0).posE<<8)+(ears.(1).posE);
+			Secho "Acquisition : "; Iecho ears.(0).posE; Secho ", ";Iecholn ears.(1).posE;
+			set earsmode=EARSMODE_WAITANDDETECT
+		)
+	);;
+		
+fun earResetRun=
+	for i=0;i<2 do let ears.i -> e in
+	if e.dirE then
+	(
+		let motorget i -> v in
+		if v==e.lvalE then
+		(
+			let time_ms -> t in
+			let t-e.ltimeE -> d in
+			if d>5000 then
+			(
+				Secholn "broken :";
+				Iecholn i;
+				set e.brokenE=1;
+				set e.posE=0;
+				set e.lvalE=v;
+				set e.targetE=0;
+				set e.ldelayE=0;
+				earMotorset e 0
+			)
+		)
+		else
+		if e.targetE!=nil then
+		(
+			set e.posE=earCheck e.posE+v-e.lvalE;
+			set e.lvalE=v;
+			if e.posE==e.targetE then earMotorset e 0
+		)
+		else
+		let time_ms -> t in
+		let t-e.ltimeE -> d in
+		(
+			if (d<10000) && (d>600) && (nil!=e.ldelayE) then
+			(
+	//			Secho "gowait "; Iecholn d; Iecholn ldelay;
+				set e.posE=earCheck -EARS_OFFZERO;
+				set e.targetE=0
+			)
+			else
+			(
+	//			Secho "position "; Iecho e.numE; Secho " : "; Iecho v; Secho " during "; Iecholn d;
+				set e.ltimeE=t
+			);
+			set e.lvalE=v;
+			set e.ldelayE=d
+		)
+	);
+	if (ears.(0).dirE)==0 && (ears.(1).dirE)==0 then
+	(
+		set earsmode=EARSMODE_WAIT
+	);;
+
+fun earWaitRun=
+	for i=0;i<2 do let ears.i -> e in
+	if e.brokenE!=1 then
+	(
+		let motorget i -> v in
+		if v!=e.lvalE then
+		let v-e.lvalE-> dv in
+		if e.dirE then
+			(
+				set e.lvalE=v;
+				set e.posE=earCheck e.posE+ if e.dirE>0 then dv else -dv;
+				if e.posE==e.targetE then
+				(
+//				Secho "stop "; Iecholn e.numE;
+					earMotorset e 0
+				)
+			)
+		else if dv>2 then
+		(
+			set e.lvalE=v;
+			if earsmode==EARSMODE_WAITANDDETECT then earStartDetect
+		)
+	);;
+
+fun earRun=
+	if earsmode==EARSMODE_RESET then earResetRun
+	else if earsmode==EARSMODE_DETECT then earDetectRun
+	else earWaitRun;
+	0;;
+
+fun earReady= earsmode!=EARSMODE_RESET;;
+fun earDetecting= earsmode==EARSMODE_DETECT;;
+fun earComplete = earReady && (!ears.(0).dirE) && (!ears.(1).dirE);;
+
+fun earDetect=
+	if earsmode== EARSMODE_WAIT then set earsmode=EARSMODE_WAITANDDETECT;;
+
+fun earUndetect=
+	if earsmode== EARSMODE_WAITANDDETECT then set earsmode=EARSMODE_WAIT;;
+
+fun earStop=
+	Secholn "earStop";
+	if earsmode!=EARSMODE_RESET then for i=0;i<2 do earMotorset ears.i 0;
+	0;;
+
+fun earTarget i=ears.(i).targetE;;
+
+fun earGo i p d=
+	if earsmode==EARSMODE_WAIT ||earsmode==EARSMODE_WAITANDDETECT then
+	let ears.i->e in
+	let earCheck p->p in
+	if e.brokenE==1 then
+	(
+		Secho "earGo ";Iecho i; Secholn " broken !";
+		nil
+	)
+	else		
+	if p!=e.targetE then
+	(
+		Secho "earGo ";Iecho i; Secho " to ";Iecho p;Secho " dir ";Iecholn d;
+		set e.targetE=p;
+		earMotorset e if p==e.posE then 0 else if d then -1 else 1
+	);
+	0;;
+
+}

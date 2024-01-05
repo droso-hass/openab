@@ -1,0 +1,33 @@
+proto main 0;;
+
+var SIMU;;
+var NOMINAL;;
+
+#include lib/std/utils.mtl
+#include lib/std/debug.mtl
+#include lib/const/config.mtl
+#include lib/net/simu.mtl
+
+
+var pingurl = "http://192.168.1.132/vl/hello";;
+
+
+
+fun _pingcbhttp http res=
+	Secholn "ping=";
+    Secholn res;
+	0;;
+
+
+fun runpingstart=
+	httprequest "GET" Secholn pingurl nil #_pingcbhttp HTTP_NORMAL;
+	0;;
+
+fun main=
+    Secholn "starting";
+    confInit;
+    netstart;
+    startdnsclient;
+    runpingstart;
+    Secholn "hello world";
+    0;;

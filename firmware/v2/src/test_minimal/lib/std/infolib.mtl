@@ -1,0 +1,153 @@
+ifdef INFOLIB {
+
+var infodata;;
+var infosrc;;
+
+fun infoInit=
+	set infosrc=tabnew 0 32;
+
+	set infodata=
+[0
+{
+	[4 {3 3 3 0 0 0}]
+	[4 {0 3 0 4 0 4}]
+	[3 {4 4 4 4 4 4 4 4 4 0 0 0}]
+	[3 {4 0 0 0 0 4 0 0 0 0 4 0 4 0 0 0 0 0 4 0 4 0 0 0}]
+	[4 {4 0 0 0 4 0 4 0 0 0 4 0 0 0 4 0 4 0 0 0 4 0 4 0}]
+	[3 {0 3 4 3 4 0xd5 0x47 0 0 4 3 0 0 4 3 0 0 0 3 4 0 0 0 0}]
+}
+]::
+[1
+{
+	[1 {0 0 11 0 11 0 11 0 0 0 0 0}]
+	[2 {0 0 11 0 11 0 11 0 0 0 0 0}]
+	[3 {0 0 11 0 11 0 11 0 0 0 0 0}]
+	[4 {0 11 0 0 0 0}]
+	[3 {11 0 0 0 11 0 0 0 11 0 0 0}]
+	[2 {11 0 0 0 11 0 0 0 11 0 0 0}]
+	[1 {11 0 0 0 11 0 0 0 11 0 0 0}]
+}
+]::
+[2
+{
+	[6 {9 0 9 0 0 0}]
+	[5 {0 9 0 9 0 9 0 0 0 0 0 0}]
+	[4 {0 9 0 9 0 9 0 0 0 0 0 0}]
+	[3 {0 9 0 9 0 9 0 0 0 0 0 0}]
+	[2 {0 9 0 9 0 9 0 0 0 0 0 0}]
+	[1 {0 9 0 9 0 9 0 0 0 0 0 0}]
+	[0 {0 9 0 9 0 9 0 0 0 0 0 0}]
+}
+]::
+[5
+{
+	[3 {5 0 0 0 5 0 0 0 5 0 5 0}]
+	[3 {0 5 0 0 0 0}]
+	[3 {5 0 5 0 0 0}]
+	[3 {5 5 5 0 0 0}]
+}
+]::
+[6
+{
+	[4 {6 6 6 6 6 6 6 6 6 0 0 0}]
+	[4 {6 6 6 6 6 6 6 6 6 0 0 0}]
+	[4 {6 6 6 6 6 6 6 6 6 0 0 0}]
+	[4 {6 6 6 6 6 6 6 6 6 0 0 0}]
+	[4 {6 6 6 6 6 6 6 6 6 0 0 0}]
+	[3 {6 0 0 0 6 0 6 6 0 6 6 6 0 6 6 0 0 6 6 0 6 6 6 6}]
+	[3 {6 0 0 0 6 0 6 6 0 6 6 6 0 6 6 0 0 6 6 0 6 6 6 6}]
+	[3 {6 0 0 0 6 0 6 6 0 6 6 6 0 6 6 0 0 6 6 0 6 6 6 6}]
+	[2 {6 0 0 0 6 0 6 6 0 6 6 6 0 6 6 0 0 6 6 0 6 6 6 6}]
+	[2 {6 0 0 0 6 0 6 6 0 6 6 6 0 6 6 0 0 6 6 0 6 6 6 6}]
+	[2 {6 0 0 0 6 0 6 6 0 6 6 6 0 6 6 0 0 6 6 0 6 6 6 6}]
+}
+]::
+nil;;
+
+var col={
+	0x000000 0xff0000 0x00ff00 0xffff00 0x0000ff 0xff00ff 0x00ffff 0xffffff
+	0x808080 0xff8080 0x80ff80 0xffff80 0x8080ff 0xff80ff 0x80ffff 0xff8000
+};;
+
+
+var infoType;;
+var infoVal;;
+var infoInd;;
+var infoCount;;
+
+var infoTime;;
+var infoIndex=0;;
+
+var INFO_TIMEOUT=10;;
+
+fun infobytype i=listswitch infodata i;;
+
+fun nextindex src i=
+	let i+2-> i in
+	if i>=16 then 0 else if src.i then i else nextindex src i;;
+
+fun infoNext=
+	set infoIndex=nextindex infosrc infoIndex;
+	set infoType=(infosrc.(infoIndex))-1;
+	set infoVal=infosrc.(infoIndex+1);
+	set infoTime=time;
+	set infoInd=0;
+	let infobytype infoType -> t0 in
+	if t0==nil then set infoTime=nil
+	else set infoCount=let t0.infoVal ->[c0 _] in 2<<c0;
+	0;;
+
+fun dumpinfosrc=
+	for i=0;i<16 do (Iecho infosrc.i;Secho " : ");
+	Secholn ""
+	;;
+
+fun infoRun=
+	if !earDetecting then
+	(
+		set infoType=(infosrc.(infoIndex))-1;
+		if infoTime==nil || (time-infoTime>INFO_TIMEOUT) || infoType<0 then infoNext;
+
+		let infosrc.(16+2) -> msg1 in
+		let infosrc.(16+3) -> msg2 in
+		let (time_ms>>8)&7 -> t in
+			led 0 if (t==1 && msg1) || (t==3 && msg1 && msg2) then 0xff00ff else 0;
+
+		set infoType=(infosrc.(infoIndex))-1;
+		set infoVal=infosrc.(infoIndex+1);
+		let infobytype infoType -> t0 in
+		let t0.infoVal ->[c0 t] in
+		if t!=nil then
+		(
+			led 1 col.(t.infoInd);
+			led 2 col.(t.(1+infoInd));
+			led 3 col.(t.(2+infoInd));
+			if (set infoCount=infoCount-1)<=0 then
+			(
+				set infoInd=infoInd+3;
+				set infoCount=2<<c0;
+				if infoInd>=tablen t then set infoInd=0
+			)
+		)
+		else
+		(
+			led 3 0; led 2 0; led 1 0
+		)
+	);;
+		
+
+fun infoUpdate data=
+	let strlen data -> len in
+	for i=0;i<len do set infosrc.i=strget data i;
+	0;;
+
+fun infoGet_ i typ=
+	if i>=tablen infosrc then 0
+	else if typ==infosrc.i then infosrc.(i+1)
+	else infoGet_ i+1 typ;;
+
+fun infoGet typ=infoGet_ 0 typ;;
+	
+
+
+}

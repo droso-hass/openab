@@ -1,0 +1,996 @@
+// VLISP - Feb 06 - by Sylvain Huet
+// Metal
+// NOMINAL 010115
+
+proto main 0;;
+
+//var SIMU;;
+var NOMINAL;;
+
+var AUDIOLIB;;
+
+fun setleds col= for i=0;i<5 do led i col;;
+
+
+
+var TYPE_taichi=14;;
+
+var tab_osc={
+	0 0 0 0 0 0 1 1 2 3 3 4 5 6 7 8 
+	9 10 12 13 15 16 18 19 21 23 25 27 29 31 33 35 
+	37 39 42 44 46 49 51 54 56 59 62 64 67 70 73 76 
+	79 81 84 87 90 93 96 99 103 106 109 112 115 118 121 124
+};;
+
+
+fun osc x=
+	let (x>>6)&3 -> q in
+	let x&255 -> x in
+	if q==0 then tab_osc.x
+	else if q==1 then 255-tab_osc.(127-x)
+	else if q==2 then 255-tab_osc.(x-128)
+	else tab_osc.(255-x);;
+
+
+
+type Run= configstartRun | configwaitRun _|  pingstartRun |pingwaitRun _|
+	msgloadstartRun | msgloadwaitRun _ | msginitwaitRun | msgchorRun _ |msgchorstreamRun _ | msgRun _| idlewaitRun | waitRun _ |
+	pingsendwaitRun _ |recordRun |asleepRun |recordStartRun;;
+
+var run;;
+var pingsrv;;
+var broadcasturl;;
+var senddata=0;;
+var currenttrame=0;;
+var pingdelay=10;;
+var recorddelay=4;;
+
+var sources;;
+var extleft;;
+var extright;;
+
+var msgtoplay;;
+var msgtimestart;;
+var rsctoget;;
+var rscloaded;;
+var rsctmp;;	// buffer de chargement des ressources en petits morceaux
+
+proto _pingcbhttp 2;;
+
+var BROADCAST_KEYWORD="broadcast";;
+var SIGNCUTSIZE=40000;; // taille max du fichier audio de signature
+
+var MSG_IDLE=0x7fffffff;;
+var MSG_ASLEEP=0x7ffffffe;;
+
+var STREAMING_MOTORSTOP=60;;
+var STREAMING_PING=60;;
+
+var LED_TIMEOUT=600;;
+var CH_frame_duration=1;;
+//var CH_set_color=6;;
+var CH_set_led_color=7;;
+var CH_set_motor=8;;
+var CH_set_led_palette=14;;
+//var CH_set_palette=15;;
+var CH_randmidi=16;;
+var CH_avance=17;;
+var CH_ifne=18;;
+var CH_attend=19;;
+
+var palette;;
+
+var palettes=
+{
+	{255 12 0 0 255 31 255 242 0 0 3 255 255 242 0 0 255 31 255 12 0 0 0 0}
+	{95 0 255 127 0 255 146 0 255 191 0 255 223 0 255 255 0 223 255 0 146 0 0 0}
+	{255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0}
+	{254 128 2 243 68 2 216 6 7 200 4 13 170 0 24 218 5 96 207 6 138 0 0 0}
+	{20 155 18 255 0 0 252 243 5 20 155 18 252 243 5 255 0 0 20 155 18 0 0 0}
+	{252 238 71 206 59 69 85 68 212 78 167 82 243 75 153 151 71 196 255 255 255 0 0 0}
+	{204 255 102 204 255 0 153 255 0 51 204 0 0 153 51 0 136 0 0 102 510 0 0}
+	{204 255 102 204 255 0 153 255 0 51 204 0 0 153 51 0 136 0 0 102 510 0 0}
+};;
+
+
+
+
+fun controlsound s=
+	wavstartlocal s::nil;
+	0;;
+
+var buttonlast;;
+var buttontime;;
+var buttonevent;;
+var buttonclicn;;
+
+var BUTTON_CLIC=1;;
+var BUTTON_DCLIC=2;;
+var BUTTON_LCLIC=3;;
+var BUTTON_DLCLIC=4;;
+var T_DCLIC=500;;
+var T_LCLIC=1500;;
+
+
+fun buttonloop=
+	let button2 -> b in
+	if b!=buttonlast then
+	(
+		set buttonlast=b;
+		if b then
+		(
+			if buttontime==nil then
+			(
+				set buttonclicn=1;
+				set buttontime=time_ms
+			)
+			else
+			(
+				set buttonclicn=buttonclicn+1;
+				set buttontime=time_ms
+			)
+		)
+		else if buttontime!=nil then set buttontime=time_ms
+	)
+	else if (buttontime!=nil) then
+	(
+		if ((time_ms-buttontime)>=T_LCLIC) then
+		(
+			if buttonlast then set buttonevent=if buttonclicn==1 then BUTTON_LCLIC else BUTTON_DLCLIC;
+			set buttontime=nil
+		)
+		else if ((time_ms-buttontime)>=T_DCLIC)&&!buttonlast then
+		(
+			set buttonevent=if buttonclicn==1 then BUTTON_CLIC else BUTTON_DCLIC;
+			set buttontime=nil
+		)
+	);;
+
+fun buttongetevent=
+	let buttonevent -> ev in
+	(
+		set buttonevent=nil;
+		ev
+	);;
+
+proto loop 0;;
+fun buttoncheckevent=
+	buttonloop;
+	if buttonevent!=nil then loop;
+	0;;
+
+//var netMac="00904B8C540D";;
+fun _webmac key i=
+	if i<strlen key then (ctoh strget key i)::_webmac key i+1;;
+
+fun webmac key=strcatlist _webmac key 0;;
+
+fun configurl=strcatlist confGetServerUrl::"/locate.jsp?sn="::(webmac netMac)::"&h="::(itoa HARDWARE)::nil;;
+
+fun mktramenumber t= if t==MSG_IDLE then "7fffffff" else if t==MSG_ASLEEP then "7ffffffe" else itoh t;;
+fun pingurl=strcatlist pingsrv::"/vl/p4.jsp?sn="::(webmac netMac)::"&v="::(itoa FIRMWARE)::"&st=1&sd="::(itoh senddata)::
+"&tc="::(mktramenumber currenttrame)::"&h="::(itoa HARDWARE)::nil;;
+
+fun recordurl mode=strcatlist pingsrv::"/vl/record.jsp?sn="::(webmac netMac)::"&v="::(itoa FIRMWARE)::"&h="::(itoa HARDWARE)::"&m="::(itoa mode)::nil;;
+fun rfidurl tag=strcatlist pingsrv::"/vl/rfid.jsp?sn="::(webmac netMac)::"&v="::(itoa FIRMWARE)::"&h="::(itoa HARDWARE)::"&t="::(webmac tag)::nil;;
+
+fun runinit=
+	set run=configstartRun;;
+
+
+fun filterconfig_word s=
+	let strstr s " " 0 -> i in
+	if i!=nil then [strsub s 0 i strsub s i+1 nil]
+	else [s nil];;
+
+fun filterconfig_line s i=
+	let strstr s "\10" i-> j in
+	if j!=nil then (filterconfig_word strsub s i j-i)::filterconfig_line s j+1
+	else if i<strlen s then (filterconfig_word strsub s i nil)::nil;;
+
+fun filterconfig s i0=
+	let strreplace s "\13" "" -> s in
+	filterconfig_line s i0;;
+
+fun dumpconfig l=
+	Secholn "##dumpconfig :";
+	for l=l;l!=nil;tl l do let hd l->[key val] in
+	(
+		Secho key; Secho " = "; Secholn val
+	);
+	l;;
+
+fun _configcbhttp http res=
+	Secholn "config=";
+	let filterconfig Secholn httpgetcontent res 0-> conf in
+	(
+		set pingsrv=listswitchstr conf "ping";
+		set broadcasturl=listswitchstr conf "broad";
+		if pingsrv!=nil && broadcasturl!=nil then set run=pingstartRun;
+		0
+	);;
+
+fun runconfigstart=
+	if netState==RT2501_S_CONNECTED && wavrunning==0 then set run=configwaitRun httprequest "GET" Secholn configurl nil #_configcbhttp HTTP_NORMAL;
+	0;;
+
+fun runconfigwait http=
+	// check timeout and retry
+	if (httpinactive http)>10000 then
+	(
+		Secholn "##timeout on configwait";
+		httpabort http;
+		set run=configstartRun
+	);
+
+	0;;
+
+
+fun bintoi3 s x=((strget s x)<<16)+((strget s x+1)<<8)+(strget s x+2);;
+
+fun pingextract_ s i res=
+	if i<strlen s then
+	let (strget s i)-> code in
+	if code==255 then res
+	else if code>=0 && code<=10 then
+		let bintoi3 s i+1 -> len in
+		if len>=0 then pingextract_ s i+4+len [code strsub s i+4 len]::res;;
+
+fun pingextract s=
+	if (strget s 0)==0x7f then pingextract_ s 1 nil;;
+
+fun srcextract s i=
+	if s!=nil && i<strlen s then [strget s i strget s i+1]::srcextract s i+2;;
+
+
+fun rscfilterurl url=
+	if 0==strstr url BROADCAST_KEYWORD 0 then strcat broadcasturl strsub url strlen BROADCAST_KEYWORD nil
+	else url;;
+
+fun rscfrommsg l=
+	if l!=nil then let hd l->[key val] in
+	if (!strcmp key "MU") || (!strcmp key "CH") then [val /*nil*/300000]::rscfrommsg tl l
+	else if (!strcmp key "MC") then [val SIGNCUTSIZE]::rscfrommsg tl l
+	else rscfrommsg tl l;;
+
+fun msgInit msg=
+Secholn "####################msgInit";
+	let atoi listswitchstr msg "ID" -> id in
+	(
+		Secholn itoh id;
+		if id==MSG_IDLE then
+		(
+			if currenttrame==MSG_IDLE then
+			(
+				earGo 0 extleft 0;
+				earGo 1 extright 0;
+				waitRun time+pingdelay
+			)
+			else
+			(
+				set currenttrame=id;
+				Secholn "-> idle";
+				setleds 0xff00ff;
+				earReset;
+				idlewaitRun
+			)
+		)
+		else if id==MSG_ASLEEP then
+		(
+			set currenttrame=id;
+			Secholn "-> asleep";
+			setleds 0xff00ff;
+			earReset;
+			asleepRun
+		)
+		else
+		(
+			// TODO : tester si le message est d�j� en m�moire
+			set msgtoplay=msg;
+			set rsctoget=rscfrommsg msg;
+			set rscloaded=nil;
+			msgloadstartRun
+		)
+	);;
+
+fun _msgloadcbhttp http res size=
+	if recording then
+	(
+		httpabort http;
+		nil
+	)
+	else if res!=nil then
+	(
+//		Secholn res;
+		set rsctmp=res::rsctmp;
+		if size!=nil && (slistlen rsctmp)>size then
+		(
+			httpabort http;
+			_msgloadcbhttp http nil nil
+		);
+		0
+	)
+	else
+	(
+		let hd rsctoget ->[url _] in
+		set rscloaded=[url tl rev rsctmp nil]::rscloaded;
+		set rsctoget=tl rsctoget;
+		set run=msgloadstartRun;
+		0
+	);;
+
+fun msgstart=
+	setleds 0xff0000;
+	earReset;
+	set palette=tabnew 8 0xff;
+	set run=msginitwaitRun;
+	set currenttrame=atoi listswitchstr msgtoplay "ID";
+	0;;
+
+fun runmsgloadstart=
+	let hd rsctoget -> [url size] in
+	if url==nil then
+	(
+		Secholn "Ready to run !";
+		msgstart;
+		0
+	)
+	else if nil!=listswitchstr rscloaded url then
+	(
+		set rsctoget=tl rsctoget;
+		runmsgloadstart
+	)
+	else
+	(
+		set rsctmp=nil;
+		set run=msgloadwaitRun httprequest "GET" Secholn rscfilterurl url nil fixarg3 #_msgloadcbhttp size HTTP_STREAM;
+		0
+	);;
+
+fun runmsgloadwait http=
+	if (httpinactive http)>10000 then
+	(
+		Secholn "##timeout on msgload";
+		httpabort http;
+		set run=msgloadstartRun
+	);
+	0;;
+
+
+fun runmsginitwait=
+	// check timeout (oreille bloqu�e)
+	if earReady then
+	(
+		setleds 0;
+		set msgtimestart=time;
+		set run=msgRun 0
+	);
+	0;;
+
+fun _controlsend val=
+	if val!=nil then set senddata=val;
+	set run=pingsendwaitRun httprequest "GET" Secholn pingurl nil #_pingcbhttp HTTP_NORMAL;
+	0;;
+
+fun runpingsendwait http=
+	for i=1;i<4 do let osc time_ms-i*50 -> v in led i v*257;
+	// check timeout and retry
+	if (httpinactive http)>10000 then
+	(
+		Secholn "##timeout on pingsendwait";
+		httpabort http;
+		_controlsend nil
+	);
+
+	0;;
+
+
+
+
+fun msgend=
+	_controlsend 2;
+	0;;
+
+var recordtimestart;;
+var recordmode;;
+var recorddata;;
+var recordreq;;
+var recordretry;;
+var recordplayend;;
+
+fun uploading = recordreq!=nil;;
+
+fun runrecordstart=
+	if !wavrunning then
+	(
+	led 0 0xff0000;//if time_ms&64 then 0xff0000 else 0;
+//		setleds 0;
+		unforcevol;
+		recstart;
+		set recordtimestart=time_ms;
+		set run=recordRun
+	);;
+
+fun _controlrecord mode=
+	setleds 0x00;
+	wavstop;
+	motorset 0 0;
+	motorset 1 0;
+	forcevol 64;
+	wavstartlocalEx mp3_startrecord::nil 100;
+	set recordmode=mode;
+	set run=recordStartRun;
+	0;;
+
+fun _cbrecordhttp http res=
+	set recorddata=nil;
+	set recordreq=nil;
+	Secholn res;
+	setleds 0x00;
+	if recordplayend!=nil then
+	(
+		set recordplayend=nil;
+		wavstartlocal midi_endrecord::nil
+	);
+	set run=waitRun time+recorddelay;
+	0;;
+
+fun uploadtimeout=
+	if uploading then
+	(
+		if recordplayend!=nil && ((recordplayend-time_ms)<0) then
+		(
+			set recordplayend=nil;
+			wavstartlocal midi_endrecord::nil
+		);
+		if (httpinactive recordreq)>10000 then
+		(
+			Secholn "##timeout on upload";
+			httpabort recordreq;
+			set recordreq=nil;
+			if recordretry>0 then
+			(
+				set recordretry=recordretry-1;
+				set recordreq=httprequest "POST" Secholn recordurl recordmode recorddata #_cbrecordhttp HTTP_NORMAL;
+				nil
+			)
+			else
+			(
+				set recorddata=nil;
+				set run=waitRun time+1
+			)
+		)
+	);;
+
+fun runrecord=
+//	led 0 if time_ms&1024 then 0xff0000 else 0;
+	if !button2 || ((time_ms-recordtimestart)>8000)then
+	(
+		recstop;
+		setleds 0x00;
+		let recriff -> wavfile in
+		(
+				set recorddata=strcatlist wavfile;
+				set recordretry=3;
+				set recordplayend=time_ms+400;
+				set recordreq=httprequest "POST" Secholn recordurl recordmode recorddata #_cbrecordhttp HTTP_NORMAL;
+				set run=waitRun time+recorddelay
+		)
+	);;
+
+var chordata;;
+var chorindex;;
+var chortimescale;;
+var chornexttime;;
+var chorrandom;;
+var chortaichimotor;;
+
+fun msgstartchor chor i0=
+	set chordata=strcatlist chor;
+	set chorindex=4+1;	// on saute le header et la premi�re attente
+	set chortimescale=0;
+	set chornexttime=time_ms;
+	set run=msgchorRun i0;
+	0;;
+
+fun taichistart =
+	Secho "taichistart ";
+	set chorrandom=((Iecholn rand&255)*6)>>8;
+	set chortaichimotor={rand&1 rand&1};
+	earUndetect;
+	msgstartchor taichi::nil nil;
+	0;;
+
+fun msgendchor i0=
+	set chornexttime=nil;
+	if i0==nil then
+	(
+		earDetect;
+		set run=waitRun time+pingdelay
+	)
+	else set run=msgRun i0+1;
+	0;;
+
+
+fun setpalette p=
+	Secho "############setpalette ";Iecholn p&7;
+	let palettes.(p&7) -> p in
+	for i=0;i<8 do let i*3 -> j in set palette.i=((p.(j))<<16)+((p.(j+1))<<8)+p.(j+2);;
+
+fun setcolor i val=
+	Secho "############setcolor ";Iecho i; Secho " = $";Secholn itoh val;
+	set palette.i=val;;
+
+
+fun runmsgchor i0=
+//	Secho "runmsgchor i:";Iecho chorindex; Secho " t:";Iecholn chornexttime;
+	if chornexttime-time_ms<=0 then
+	(
+		if chorindex>=strlen chordata then msgendchor i0
+		else let strget chordata chorindex -> code in
+		set chorindex=chorindex+2+
+		if code==CH_frame_duration then
+		(
+			set chortimescale=10*strget chordata chorindex+1;
+			1	//nb de param�tres
+		)
+		else if code==CH_set_motor then
+		(
+			earGo (strget chordata chorindex+1) (strget chordata chorindex+2) (strget chordata chorindex+3);
+			3
+		)
+		else if code==CH_set_led_color then
+		(
+//			Secho "set_led_color ";
+			led 4-strget chordata chorindex+1 ((strget chordata chorindex+2)<<16)+((strget chordata chorindex+3)<<8)+(strget chordata chorindex+4);
+			6
+		)
+		else if code==CH_set_led_palette then
+		(
+//			Secho "set_led_palette ";
+			led 4-strget chordata chorindex+1 palette.(7&strget chordata chorindex+2);
+			2
+		)
+		else if code==CH_randmidi then
+		(
+			Secholn "randmidi";
+			let getmidilist -> t in
+			let tablen t -> n in
+			if n>0 then let t.(Iecholn ((rand&255)*n)>>8) -> music in
+				wavstartlocal music::nil;
+			0
+		)
+		else if code==CH_avance then
+		(
+			Secholn "avance";
+			let (strget chordata chorindex+1) -> i in
+			let (strget chordata chorindex+2) -> delta in
+			earGo i (earTarget i)+if chortaichimotor.i then -delta else delta chortaichimotor.i;
+			2
+		)
+		else if code==CH_ifne then
+		(
+			Secho "ifne ";Iecholn chorrandom;
+			if chorrandom==(Iecholn strget chordata chorindex+1) then 3
+			else 3+((strget chordata chorindex+2)<<8)+(strget chordata chorindex+3)
+		)
+		else if code==CH_attend then
+		(
+			Secholn "attend";
+			if earComplete && wavrunning==0 then 0
+			else -2
+		)
+		else
+		(
+			msgendchor i0;
+			0
+		);
+		if chornexttime!=nil then
+		(
+			set chornexttime=chornexttime+(strget chordata chorindex-1)*chortimescale;
+			runmsgchor i0
+		)
+	);;
+
+fun _pingcbstreaming http res lastid=
+	Secholn "streaming ping";
+	if !recording then
+	let nil->msg in
+	(
+		let pingextract httpgetcontent res -> ltrame in
+		(
+			for l=ltrame;l!=nil;tl l do let hd l-> [code val] in
+			(
+				if code==10 then
+				(
+					uncrypt val 1 nil 0x47 47;
+					set msg=dumpconfig filterconfig val 1;
+					0
+				);
+				0
+			)
+		);
+		if msg!=nil then
+		let atoi listswitchstr msg "ID" -> id in
+		if id!=currenttrame && currenttrame==lastid then
+		(
+			wavstop;
+			0
+		)
+	);
+	0;;
+
+
+var chorst_data;;
+var chorst_index;;
+var chorst_tempo;;
+var chorst_repeat;;
+var chorst_nexttime;;
+
+fun dochorstream=
+	if chorst_data==nil || ((chorst_index>=strlen chorst_data)&&(chorst_repeat<1)) then
+	(
+		Secho "Start Chor Stream ";
+		set chorst_data=listnth chorstream Iecholn rand&3;
+		set chorst_index=1;
+		Secho "tempo "; Iecholn set chorst_tempo=160+(((rand&255)*90)>>8);
+		Secho "repeat "; Iecholn set chorst_repeat=3+(((rand&255)*18)>>8);
+		set chorst_nexttime=time_ms
+	);
+	while (chorst_index<strlen chorst_data) && time_ms-chorst_nexttime > 0 do
+	(
+		led strget chorst_data chorst_index
+			((strget chorst_data chorst_index+1)<<16) + 
+			((strget chorst_data chorst_index+2)<<8) + 
+			((strget chorst_data chorst_index+3));
+		set chorst_index=chorst_index+5;
+		let strget chorst_data chorst_index-1 -> delay in
+		if delay!=nil then set chorst_nexttime=chorst_nexttime+delay*chorst_tempo
+	);
+	if (chorst_index>=strlen chorst_data) then
+	(
+		set chorst_index=1;
+		Secho "repeat "; Iecholn set chorst_repeat=chorst_repeat-1;
+		set chorst_nexttime=time_ms
+	);
+	0;;
+
+fun runmsgchorstreaming z=
+	let z->[i0 t0 ping0] in
+	if wavrunning==0 then
+	(
+		motorset 0 0;
+		motorset 1 0;
+		set run=msgRun i0+1;
+		nil
+	)
+	else
+	(
+		if wav_buffering then
+		(
+			led 0 if time_ms&256 then 0xff00ff else 0
+		)
+		else dochorstream;
+
+		if (time-msgtimestart)>STREAMING_MOTORSTOP then
+		(
+			motorset 0 0;
+			motorset 1 0;
+			0
+		)
+		else
+		(
+			let (osc ((time_ms*(3))>>8))>>6 -> i0 in
+				motorset 0 if i0==3 then 1 else if i0==1 then (-1) else 0;
+			let (osc ((time_ms*(5))>>8))>>6 -> i0 in
+				motorset 1 if i0==3 then 1 else if i0==1 then (-1) else 0
+		);
+		if (time-ping0)>STREAMING_PING then
+		(
+			update z with [_ _ time];
+			httprequest "GET" Secholn pingurl nil fixarg3 #_pingcbstreaming currenttrame HTTP_NORMAL
+		);
+		0
+	);;
+
+fun runmsg i0=
+//	Secho "runmsg ";Iecholn i0;
+	let listnth msgtoplay i0 -> [key val] in
+	if (Secholn key)==nil then
+	(
+		msgend;
+		0
+	)
+	else if (!strcmp key "MU") || (!strcmp key "MC") then
+	(
+		Secholn "###########Start music";
+		let listswitchstr rscloaded Secholn val -> music in
+			if music==nil then Secholn "###nilmusic";
+		wavstartlocal listswitchstr rscloaded val;
+		set run=msgRun i0+1;
+		0
+	)
+	else if !strcmp key "ST" then
+	(
+		Secholn "###########Start streaming music";
+		//IPecho netdns 0 1;
+		//startdnsclient;
+		set chorst_data=nil;
+		let rscfilterurl val -> music in wavstarthttp music;
+		set run=msgchorstreamRun [i0 time time];
+		0
+	)
+	else if !strcmp key "MW" then
+	(
+		if wavrunning==0 then set run=msgRun i0+1;
+		0
+	)
+	else if !strcmp key "CH" then
+	(
+		msgstartchor listswitchstr rscloaded val i0;
+		0
+	)
+	else
+	(
+		if !strcmp key "PL" then setpalette atoi val;
+		if !strcmp key "CL" then
+				let atoi val -> x in setcolor (x>>24) x&0xffffff;
+		set run=msgRun i0+1;
+		runmsg i0+1
+	);;
+
+fun runasleep=
+	if earReady then
+	(
+		setleds 0;
+		earGo 0 8 0;
+		earGo 1 8 0;
+		set run=waitRun time+pingdelay;
+		0
+	);;
+
+var nexttaichi;;
+
+fun dotaichinow=
+	Secho "checktaichi ";
+	let Iecholn infoGet TYPE_taichi -> v in
+	if v then
+		let if nexttaichi!=nil then time-nexttaichi>0 else 0 -> now in
+		(
+			if now || nexttaichi==nil then set nexttaichi=time+((v*60*((rand&127)+64))>>7);
+			now
+		)
+	else
+	(
+		set nexttaichi=nil;
+		0
+	);;
+
+fun _pingcbhttp http res=
+	Secholn "ping=";
+	if !recording then
+	let nil->msg in
+	(
+		let pingextract dump httpgetcontent res -> ltrame in
+		(
+			if ltrame!=nil then set senddata=0;	// acquittement implicite de l'envoi de donn�es
+			for l=ltrame;l!=nil;tl l do let hd l-> [code val] in
+			(
+				Iecho code; Secho " : ";
+				if code==3 then set pingdelay=Iecholn (strget val 0)*1;
+				if code==4 then
+				(
+//					set sources=srcextract dump strsub val 4 nil 0;
+					infoUpdate strsub val 4 nil;
+					let strget val 20 -> newleft in
+					let strget val 21 -> newright in
+					(
+						if (extleft!=nil) &&((newleft!=extleft) || (newright!=extright)) then
+						(
+							controlsound midi_communion
+						);
+						set extleft=newleft;
+						set extright=newright
+					)
+				);
+				if code==10 then
+				(
+					uncrypt val 1 nil 0x47 47;
+					set msg=dumpconfig filterconfig val 1;
+					0
+				);
+				if code==9 then
+				(
+					reboot 0x0407FE58 0x13fb6754;
+					0
+				);
+				0
+			)
+		);
+		if msg==nil then
+		(
+			if currenttrame==MSG_IDLE then
+			(
+				earGo 0 extleft 0;
+				earGo 1 extright 0;
+				if dotaichinow then (taichistart;nil)
+				else set run=waitRun time+pingdelay
+			)
+			else set run=waitRun time+pingdelay
+		)
+		else
+		set run=msgInit msg
+	);
+	0;;
+
+fun runpingstart=
+	if netState==RT2501_S_CONNECTED then set run=pingwaitRun httprequest "GET" Secholn pingurl nil #_pingcbhttp HTTP_NORMAL;
+	0;;
+
+fun runpingwait http=
+	// check timeout and retry
+	if (httpinactive http)>10000 then
+	(
+		Secholn "##timeout on pingwait";
+		httpabort http;
+		set run=waitRun time+pingdelay
+	);
+	0;;
+
+fun runwait t=
+	if t-time<0 then set run=pingstartRun;
+	0;;
+
+
+fun runidlewait=
+	// check timeout (oreille bloqu�e)
+	if earReady then
+	(
+		earDetect;
+		setleds 0;
+		earGo 0 extleft 0;
+		earGo 1 extright 0;
+		set run=waitRun time+pingdelay
+	);
+	0;;
+
+fun bottomled=
+	if !earDetecting then
+	let (time-lasthttpevent)>LED_TIMEOUT -> offline in
+	let uploading | match run with (msgloadwaitRun _-> 2)|(_->0) -> download in
+	let osc time_ms>>(4-download) -> v in
+	led 4 if !offline then v*0x10001 else 0xff00ff;
+	0;;
+
+var lastrfid;;
+
+fun _cbrfidhttp http res=
+	Secholn res;
+	0;;
+
+fun dumprfid l0=
+	for l=l0;l!=nil;tl l do let hd l->x in Secholn webmac x;
+	l0;;
+
+fun controlrfid=
+//	let hd dumprfid rfidGetList -> rfid in
+	let rfidGet -> rfid in
+	if strcmp rfid lastrfid then
+	(
+		set lastrfid=rfid;
+		if rfid!=nil then
+		(
+/*			let IPecho rfidRead rfid 2 0 1 -> val in
+			let netSeqAdd val 1 -> val2 in
+			Iecholn rfidWrite rfid 2 val2;
+			0
+*/
+			controlsound midi_RFIDok;
+			httprequest "GET" rfidurl rfid nil #_cbrfidhttp HTTP_NORMAL
+		)
+	);
+	0;;
+
+fun controlplay=
+	let buttongetevent -> ev in
+	if ev!=nil then
+	(
+		Secholn "controlplay";
+		wavstop;
+		earStop;
+		if ev==BUTTON_CLIC then	(controlsound midi_abort;_controlsend 5) //pause
+		else if ev==BUTTON_DCLIC then (controlsound midi_ack;_controlsend 1) //ackall
+		else if ev==BUTTON_LCLIC then _controlsend 5 //pause ou record ?
+	)
+	;;
+
+fun controlwait=
+	let buttongetevent -> ev in
+	let if ev==nil then eargetevent else ev -> ev in
+	if ev!=nil then
+	(
+		Secholn "controlwait";
+		wavstop;
+		earStop;
+		if ev==BUTTON_CLIC then	_controlsend 3 //relire
+		else if ev==BUTTON_DCLIC then (controlsound midi_ack;_controlsend 1) //ackall
+		else if ev==BUTTON_LCLIC then _controlrecord 0	// _controlsend 4 //back ou record
+		else if ev==BUTTON_DLCLIC then _controlrecord 1	// _controlsend 4 //back ou record
+		else if ev&0x8000 then (controlsound midi_acquired;_controlsend ev)
+	);
+	controlrfid
+	;;
+
+
+
+var CONTROL_WAIT=1;;
+var CONTROL_PLAY=2;;
+
+fun loop=
+//Secho "l";
+	wifiRun;
+
+	if netState==RT2501_S_IDLE then
+	match wifi with
+	(initW -> nil)
+	|(_ ->
+		Secholn "######### wifi lost";
+		set wifi=reconnectW;
+		0
+	);
+
+	buttonloop;
+//	buttongetevent;
+	let match run with
+	( configstartRun -> earRun;bottomled;runconfigstart;0 )|
+	( configwaitRun http -> earRun;bottomled;runconfigwait http ; 0)|
+	( pingstartRun -> earRun;if currenttrame!=MSG_ASLEEP then bottomled;runpingstart;0)|
+	( pingwaitRun http -> earRun; if currenttrame!=MSG_ASLEEP then (infoRun;bottomled);runpingwait http;if currenttrame!=MSG_ASLEEP then CONTROL_WAIT)|
+	( waitRun t -> earRun;if currenttrame!=MSG_ASLEEP then (infoRun;bottomled);runwait t; if currenttrame!=MSG_ASLEEP then CONTROL_WAIT)|
+	( msgloadstartRun -> earRun;infoRun;bottomled;runmsgloadstart; CONTROL_WAIT)|
+	( msgloadwaitRun http-> earRun;infoRun;bottomled;runmsgloadwait http;CONTROL_WAIT)|
+	( msginitwaitRun -> earRun;runmsginitwait;CONTROL_PLAY)|
+	( msgRun i-> earRun;runmsg i;CONTROL_PLAY)|
+	( msgchorRun i-> earRun;runmsgchor i;CONTROL_PLAY)|
+	( msgchorstreamRun i->runmsgchorstreaming i;CONTROL_PLAY)|
+	( idlewaitRun -> earRun;runidlewait;CONTROL_WAIT)|
+	( pingsendwaitRun http->bottomled;runpingsendwait http;0)|
+	( recordRun -> runrecord; 0)|
+	( asleepRun ->earRun;runasleep;0) |
+	( recordStartRun -> runrecordstart; 0) |
+	(_->0) -> keymanager in
+	if keymanager==CONTROL_WAIT then controlwait
+	else if keymanager==CONTROL_PLAY then controlplay
+	else buttongetevent;
+	uploadtimeout;
+
+
+//	Iecholn netRssi;
+
+//	Secholn ":loop";
+
+//	rfidtest;
+	wavtime;
+
+
+	updatevol;
+	0;;
+
+fun main=
+	MACecho netMac 0 1;
+	set master=0;
+	Secholn ":started";
+	confInit;
+	wifiInit 0;
+	loopcb	#loop;
+	earInit;
+	infoInit;
+	netstart;
+	startdnsclient;
+	Secholn ":done";
+	srand time_ms;
+	updatevol;
+//	wavstartlocal midi_endrecord::nil;
+	dumpscan wifiscans;
+	runinit;
+	0;;
