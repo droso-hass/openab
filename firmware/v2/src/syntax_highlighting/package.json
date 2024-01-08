@@ -1,0 +1,25 @@
+{
+  "name": "metal",
+  "displayName": "Metal",
+  "description": "metal language support",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "metal",
+      "aliases": ["metal", "metal"],
+      "extensions": [".mtl"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "metal",
+      "scopeName": "source.metal",
+      "path": "./syntaxes/metal.tmLanguage.json"
+    }]
+  }
+}

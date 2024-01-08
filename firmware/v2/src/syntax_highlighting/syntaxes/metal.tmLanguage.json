@@ -1,0 +1,59 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "metal",
+  "patterns": [
+    {
+      "name": "support.function.metal",
+      "match": "\\b(hd|tl|tabnew|tablen|abs|min|max|rand|srand|strnew|strset|strcpy|vstrcmp|strfind|strfindrev|strlen|strget|strsub|strcat|strcatlist|atoi|itoa|ctoa|itoh|ctoh|itobin2|strcmp|crypt|uncrypt|listswitch|listswitchstr|led|motorset|motorget|button2|button3|load|save|loopcb|rfidGet|reboot|flashFirmware|gc|corePP|corePush|coreBit0|netCb|netSend|netState|netMac|netChk|netSetmode|netScan|netAuth|netPmk|netRssi|netSeqAdd|strgetword|strputword|udpStart|udpCb|udpStop|udpSend|tcpOpen|tcpClose|tcpSend|tcpCb|tcpListen|tcpEnable|playStart|playFeed|playStop|recStart|recStop|recVol|sndVol|playTime|sndRefresh|sndWrite|sndRead|sndFeed|sndAmpli|adp2wav|wav2adp|alaw2wav|wav2alaw|Secholn|Secho|Iecholn|Iecho|time|time_ms|bytecode|envget|envset|rfidGetList|rfidRead|rfidWrite)\\b"
+    },
+    {
+      "name": "keyword.control.metal",
+      "match": "\\b(else if|if|for|then|else|ifdef|ifndef|in)\\b"
+    },
+    {
+      "name": "storage.type.variable.metal",
+      "match": "\\b(var|let)\\b"
+    },
+    {
+      "name": "storage.type.function.metal",
+      "match": "\\b(fun)\\b"
+    },
+    {
+      "name": "entity.name.type.metal",
+      "match": "\\b(type|proto)\\b"
+    },
+    {
+      "name": "comment.line.proproc.metal",
+      "match": "\\b(#ifdef|#endif|#define)\\b"
+    },
+    {
+      "name": "keyword.operator.metal",
+      "match": "\\b(&&|\\||==|!=|>|<|>=|<=|)\\b"
+    },
+    {
+      "name": "comment.line.double-slash.metal",
+      "match": "//.*$"
+    },
+    {
+      "name": "constant.numeric.dec.intcode",
+      "match": "[0-9]*\\b"
+    },
+    {
+      "name": "string.quoted.double.metal",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.metal",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "comment.block.metal",
+      "begin": "/\\*",
+      "end": "\\*/"
+    }
+  ],
+  "scopeName": "source.metal"
+}
