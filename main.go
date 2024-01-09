@@ -28,7 +28,7 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	v2.Setup(r)
+	v2.SetupRoutes(r)
 
 	fmt.Println("Ready !")
 	err := http.ListenAndServe(":80", r)

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 
@@ -40,4 +41,19 @@ func SendFile(w http.ResponseWriter, r *http.Request, path string, contentType s
 		slog.Error("error reading file", "path", path)
 	}
 	w.Write(data)
+}
+
+func GetIPFromRequest(r *http.Request) string {
+	ip := r.Header.Get("X-Real-Ip")
+	if ip == "" {
+		ip = r.Header.Get("X-Forwarded-For")
+	}
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	h, _, err := net.SplitHostPort(ip)
+	if err == nil {
+		return h
+	}
+	return ip
 }

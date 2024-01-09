@@ -7,27 +7,31 @@ var NOMINAL;;
 #include lib/std/debug.mtl
 #include lib/const/config.mtl
 #include lib/net/simu.mtl
+#include server.mtl
 
 
-var pingurl = "http://192.168.1.132/vl/hello";;
-
-
+var pingurl = "http://192.168.1.102/vl/hello";;
 
 fun _pingcbhttp http res=
 	Secholn "ping=";
     Secholn res;
 	0;;
 
-
 fun runpingstart=
 	httprequest "GET" Secholn pingurl nil #_pingcbhttp HTTP_NORMAL;
 	0;;
+
+fun loop=
+    Secholn "test";
+    0;;
 
 fun main=
     Secholn "starting";
     confInit;
     netstart;
     startdnsclient;
-    runpingstart;
-    Secholn "hello world";
+    startwebserver 5000;
+    //runpingstart;
+    //loopcb #loop;
+    Secholn "hello world ------------";
     0;;

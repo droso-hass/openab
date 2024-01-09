@@ -18,10 +18,10 @@ import (
 // broad: sounds, choreos
 // ping: rfid, recordings
 
-func Setup(r *chi.Mux) {
+func SetupRoutes(r *chi.Mux) {
 	r.Mount("/vl/bc.jsp", test())
-	r.Mount("/vl/locate.jsp", locate())
 	r.Mount("/vl/hello", hello())
+	connect("192.168.1.102:5000")
 }
 
 func test() http.HandlerFunc {
@@ -34,14 +34,8 @@ func test() http.HandlerFunc {
 
 func hello() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		connect(utils.GetIPFromRequest(r) + ":5000")
 		render.Status(r, 200)
 		render.PlainText(w, r, "http hello world !")
-	}
-}
-
-func locate() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		render.Status(r, 200)
-		render.PlainText(w, r, "ping 192.168.1.21\nbroad 192.168.1.21\nxmpp_domain dev.nab.lan:5000")
 	}
 }
