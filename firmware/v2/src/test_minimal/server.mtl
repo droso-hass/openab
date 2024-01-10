@@ -3,77 +3,32 @@
 // TCP Socket Server
 //--------------------------------------------------------------------------------------------------
 
-type Sock=[sockInput sockOutput sockIndex sockCloseAfter sockCallback];;
 
-fun tcpwrite cnx sock=
-    if sock.sockOutput!=nil then
-    (
-        if sock.sockIndex==nil then set sock.sockIndex=0;
-        Iecholn set sock.sockIndex=writetcp cnx sock.sockOutput Iecholn sock.sockIndex;
-        if sock.sockIndex!=nil && sock.sockIndex>=strlen sock.sockOutput then
-        (   set sock.sockIndex=nil;
-            set sock.sockOutput=nil;
-            if sock.sockCloseAfter==1 then closetcp cnx
-        )
-    );
-    0;;
-
-fun tcpsend cnx sock s =
-    set sock.sockOutput=strcat sock.sockOutput s;
-    tcpwrite cnx sock;;
-
-fun tcpread cnx input sock=
+fun tcpread cnx input=
     Secholn "receive -------";
-    if input==nil ||0==strlen input then
-    (
-        // close socket when server closes it
-        Secholn "closing socket";
-        closetcp cnx;
-        //tcpsend cnx sock "test2";
-        nil
-    )
-    else
-    (
-        Secholn input;
-        Iecholn cnx;
+    Secholn input;
+    Iecholn cnx;
+    
+    let strsub input 5 1 -> idx in
+    let strcatlist "pong "::idx::nil -> ret in 
+    writetcp cnx ret nil;
+    nil
+    ;;
 
-        set sock.sockInput=input::sock.sockInput;
-        
-        let strsub input 5 1 -> idx in
-        let strcatlist "pong "::idx::nil -> ret in 
-        let call sock.sockCallback [ret] -> res in
-        (
-            tcpsend cnx sock res
-        )
+fun tcpevent cnx val msg=
+    if val==TCPREAD then tcpread cnx msg
+    else if val==TCPCLOSE then (
+        Secholn "closing socket";
+        closetcp cnx
     );
     0;;
 
-fun tcpevent cnx val msg sock=
-    if val==TCPWRITE then tcpwrite cnx sock
-    else if val==TCPCLOSE then tcpread cnx nil sock
-    else tcpread cnx msg sock;;
+fun cbsrv cnx code msg=
+    Secholn "========= NEW CONNECTION ================";
+    tcpcb cnx #tcpevent;
+    0;;
 
-fun cbsrv cnx code msg cbrequest=
-    Secholn "httpsrv accept";
-    let [sockCallback:cbrequest]-> sock in
-    (
-        tcpcb cnx fixarg4 #tcpevent sock;
-        0
-    );;
-
-fun starthttpsrv port cbrequest=
-    listentcp port fixarg4 #cbsrv cbrequest;
+fun startsocketserver port=
+    listentcp port #cbsrv;
     Secholn "starthttpsrv";
     0;;
-
-//--------------------------------------------------------------------------------------------------
-
-fun cbhttp req=
-    Secholn "req=======================";
-    Secholn req;;
-
-
-fun startwebserver port =
-    // Secho jsonstatus;
-    starthttpsrv port #cbhttp;;
-
