@@ -10,19 +10,16 @@ fun tcpread cnx input=
     
     let strsub input 5 1 -> idx in
     let strcatlist "pong "::idx::nil -> data in 
-    writetcp cnx data nil;
+    writetcp cnx data 0;
     nil
     ;;
 
 fun tcpevent cnx val msg=
     if val==TCPSTART || val==TCPREAD then tcpread cnx msg
     else if val==TCPCLOSE then (
-        // not sure why but when reconnecting after a socket is closed
-        // the system closes the connection
-        // to prevent that, we reboot after each closetcp
-        Secholn "closing socket, rebooting ..."
-        closetcp cnx;
-        reboot 0x0407FE58 0x13fb6754
+        // when using the simulator, when reconnecting after a socket is closed
+        // the system closes the connection, this is not an issue on real hardware
+        closetcp cnx
     );
     0;;
 
@@ -32,5 +29,6 @@ fun cbsrv cnx code msg=
 
 fun startsocketserver port=
     listentcp port #cbsrv;
+    led LED_NOSE RGB_BLUE;
     Secholn "start socket server";
     0;;

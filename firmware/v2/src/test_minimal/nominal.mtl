@@ -1,9 +1,9 @@
 
 
 //------------ BEGIN ./main.mtl ------------
-proto main 0;;
+//#define SIMU
 
-var SIMU;;
+proto main 0;;
 var NOMINAL;;
 
 
@@ -332,108 +332,458 @@ fun confGetProxyport=webport confGet CONF_PROXYPORT 2;;
 //------------ END ./lib/const/config.mtl ------------
 
 
-//------------ BEGIN ./lib/net/simu.mtl ------------
 
-// real
-//#include arp.mtl
-//#include ip.mtl
-//#include tcp.mtl
-//#include udp.mtl
-//#include dhcp.mtl
-//#include net.mtl
-//#include dns.mtl
-//#include http.mtl
 
-// --------------- TCP/UDP EMULATION debut
+//------------ BEGIN ./lib/net/arp.mtl ------------
+// ------------- ARP debut
+var ARPREQ=1;;
+var ARPANS=2;;
+
+var larp;;
+var larpreq;;
+
+
+fun mkarp op ipsrc macdst ipdst=
+	strcatlist
+	"\$aa\$aa\$03\$00\$00\$00\$08\$06\$00\$01\$08\$00\$06\$04\$00"::(ctoa op)::
+	mymac::
+	netip::
+	macdst::
+	ipdst
+	::nil;;
+
+fun sendarp ip=
+	netSend (mkarp ARPREQ netip macbroadcast ip) 0 nil macbroadcast 0 1;;
+
+
+fun filterarpip l src =
+	if l!=nil then let hd l->[ip _ _] in if !vstrcmp src 8+14 ip 0 4  then filterarpip tl l src
+	else (hd l)::filterarpip tl l src;;
+
+fun checkarp l src=
+	if l!=nil then let hd l->[ip _ cb] in 
+	(
+		if !vstrcmp src 8+14 ip 0 4 then
+		let strsub src 8+8 6 -> mac in
+		(
+			Secho "found MAC target : "; MACecho mac 0 1;
+			set larp=[ip mac]::larp;
+			call cb [mac]
+		);
+		checkarp tl l src
+	);;
+
+fun cbnetarp src mac=
+	Secho "<a";
+	let strget src 8+7-> op in
+	if op==1 then // req
+	(
+//		Secho "ask ";MACecho src 16+10 1; IPecho src 16+16 1;
+		if !vstrcmp src 32 netip 0 4 then
+			netSend (mkarp ARPANS netip strsub src 16 6 strsub src 22 4) 0 nil mac 0 1;
+		nil
+	)
+	else if op==2 then
+		let larpreq->l in
+		(
+			set larpreq=filterarpip larpreq src;
+			checkarp l src
+		);;
+
+fun subnet_ ip i=
+	if i<0 then 1
+	else if ((strget ip i)^(strget netip i))&(strget netmask i) then 0
+	else subnet_ ip i-1;;
+
+fun subnet ip=
+	Secho "test subnet "; IPecho ip 0 1;
+	Iecholn subnet_ ip 3;;
+	
+	
+fun arpreq ip cb=
+	let IPecho (if subnet ip then ip else netgateway) 0 1 -> ip in
+	let listswitchstr larp ip -> mac in
+	if mac!=nil then call cb [mac]
+	else
+	(
+		sendarp ip;
+		set larpreq=[ip time cb]::larpreq;	// ### attention � la taille de la liste
+		0
+	);;
+
+fun filterarp l dt =
+	if l!=nil then let hd l->[ip t _] in if (time-t)>dt then filterarp tl l dt
+	else
+	(
+		sendarp ip;
+		(hd l)::filterarp tl l dt
+	);;
+
+fun arptime =
+	set larpreq=filterarp larpreq 10;;
+
+fun resetarp=
+	set larp=nil;
+	set larpreq=nil;
+	0;;
+
+// ------------- ARP fin
+
+//------------ END ./lib/net/arp.mtl ------------
+
+
+//------------ BEGIN ./lib/net/ip.mtl ------------
+// ------------- IP debut
+fun strputchk s i w=
+	strset s i ~(w>>8);
+	strset s i+1 ~w;
+	0;;
+
+// ------------- IP fin
+
+//------------ END ./lib/net/ip.mtl ------------
+
+
+//------------ BEGIN ./lib/net/tcp.mtl ------------
+// ------------- TCP debut
+var TFIN=0x01;;
+var TSYN=0x02;;
+var TRST=0x04;;
+var TPUSH=0x08;;
+var TACK=0x10;;
+var TURGE=0x20;;
+
+var STOFF=-1;;
+var STSYN=0;;
+var STEST=1;;
+var STLISTEN=2;;
+var STFIN=3;;
+
+var CLIENT_SEQ_START="\0\0\1\0";;
+var CLIENT_SEQ_NULL="\0\0\0\0";;
 
 var TCPWRITE=0;;
 var TCPREAD=1;;
 var TCPCLOSE=-1;;
 var TCPSTART=2;;
 
-fun udpsend local localp dst dstp content mac=
-	udpSend localp dst dstp content 0 nil;;
+var TCPMAX=1024;;
 
-var ludp;;
+type Tcp=[stateT locT dstT locpT dstpT seqT ackT cbT macT lastsentT retryT locksendT enableT];;
 
-fun regudp port cb=
-	set ludp=[udpStart port cb]::ludp;;
+fun mktcp_ ipsrc ipdst portsrc portdst seq ack flag content=
+	let strcatlist 
+	"\$aa\$aa\$03\$00\$00\$00\$08\$00\$45\$00\$00\$00\$00\$00\$00\$00\100\6\0\0"::
+	ipsrc::
+	ipdst::
+	"\0\0\0\0"::
+	seq::
+	ack::
+	"\0\0\$ff\$ff\0\0\0\0"::
+	if flag&TSYN then "\2\4\5\$b4"::content::nil	// 5.b4 final : taille MSS
+	else content::nil
+	-> tcp in
+	let strlen tcp ->len in
+	(
+		strputword tcp 8+2 len-8;
+		strputword tcp 8+20 portsrc;
+		strputword tcp 8+22 portdst;
 
-fun resetudp=set ludp=nil;;
+		strset tcp 8+32 4*if flag&TSYN then 24 else 20;
+		strset tcp 8+33 flag;
+
+		strputchk tcp 8+10 netChk tcp 8 20 0;
+
+		let strnew 2 -> s in
+		(
+			strputword s 0 len-28;
+			strputchk tcp 8+36
+			 netChk tcp 8+20 (len-28) netChk s 0 2 netChk "\0\6" 0 nil netChk tcp 8+12 8 0
+		);
+		tcp
+	);;
+
+fun mktcp t flag content=
+//	Secholn "mktcp "; Secho "seq "; SEQecho t.seqT 0 1; Secho "ack "; SEQecho t.ackT 0 1;
+	mktcp_ t.locT t.dstT t.locpT t.dstpT t.seqT t.ackT flag content;;
+
+fun resendtcp t=
+	netSend t.lastsentT 0 nil (MACecho t.macT 0 1) 0 1;
+	0;;
+
+fun headerlen src=((strget src 8+32)>>4)<<2;;
+
+fun datalength src=(strgetword src 10)-20-headerlen src;;
+
+fun sendtcp t trame=
+//	Secholn "tcpSend"; dump trame; 
+	netSend trame 0 nil (/*MACecho*/ t.macT /*0 1*/) 0 1;
+	let strget trame 8+33 -> flag in
+	set t.seqT=netSeqAdd t.seqT (datalength trame)+(if flag&(TSYN|TFIN) then 1 else 0);
+	0;;
+
+fun sendtcpforretry t trame=
+	set t.lastsentT=trame;
+	set t.retryT=nil;
+	sendtcp t trame;;
 
 
-fun netudp t src ip=
-	let listswitch ludp t -> cb in
-	call cb [src nil ip];;
+fun tcpSend2 mac tcp trame=
+	set tcp.macT=mac;
+	sendtcpforretry/*sendtcp*/ tcp trame;;
 
 var ltcp;;
 
-fun writetcp t msg i=
-	tcpSend t msg i nil;;
 
-fun remtcp l t= if l!=nil then let hd l->[tt _] in if t==tt then tl l
-	else (hd l)::remtcp tl l t;;
+fun remtcp t=set t.stateT=STOFF; set ltcp=remfromlist ltcp t;;
 
-fun updatetcp l t cb= if l!=nil then let hd l->[tt _] in if t==tt then [t cb]::tl l
-	else (hd l)::updatetcp tl l t cb;;
-
-fun closetcp t=
-	set ltcp=remtcp ltcp t;
-	tcpClose t;;
-
-fun tcpcb t cb=
-	set ltcp=updatetcp ltcp t cb;
-	cb;;
-
-fun listentcp port cb=
-	set ltcp=[tcpListen port cb]::ltcp;;
-
+var counttcp;;
 
 fun opentcp local localp dst dstp cb=
-//	Secholn "opentcp";IPecho dst 0 0; Secho ":"; Iecholn dstp;
-
-	let tcpOpen dst dstp -> t in
-	if t!=nil then
+	let if localp==nil then 1024+set counttcp=((if counttcp==nil then time_ms else counttcp)+1)&16383 else localp -> localp in
+	let [stateT:STSYN locT:local dstT:dst locpT:localp dstpT:dstp seqT:CLIENT_SEQ_START ackT:CLIENT_SEQ_NULL cbT:cb enableT:1] -> tcp in
+	let mktcp tcp TSYN nil -> trame in
+	let dst -> ip in	//	ajouter le test de passerelle
 	(
-		set ltcp=[t cb]::ltcp;
-		t
+		set ltcp=tcp::ltcp;
+		arpreq ip fixarg2 fixarg3 #tcpSend2 trame tcp;
+		tcp
 	);;
 
-fun enabletcp t v=
-	tcpEnable t v;;
+fun listentcp localp cb=
+	let [stateT:STLISTEN locpT:localp cbT:cb enableT:1] -> tcp in
+	(
+		set ltcp=tcp::ltcp
+	);;
+	
+fun findtcp l localp dstp src=
+	if l!=nil then let hd l-> t in
+	if t.locpT==localp && t.dstpT==dstp && (!vstrcmp src 8+16 t.locT 0 4)&& (!vstrcmp src 8+12 t.dstT 0 4)
+	then t
+	else if t.stateT==STLISTEN && t.locpT==localp then t
+	else findtcp tl l localp dstp src;;
 
-fun nettcp t val msg=
-	if val==TCPSTART then
-		let listswitch ltcp atoi msg -> cb in
+fun sendclose t=
+	Secholn "## sendclose";
+	sendtcp t mktcp t TFIN+TACK nil;
+	set t.stateT=STFIN;
+	0;; 
+
+fun cbnettcp src mac=
+	Secho "t";
+	let /*Iecholn*/ strgetword src 8+20+2 -> locp in
+	let /*Iecholn*/ strgetword src 8+20+0 -> dstp in
+	let findtcp ltcp locp dstp src -> t in
+	if t!=nil && t.enableT then let t.stateT -> st in
+		let /*Iecholn*/ strget src 8+33 -> flag in
+		let /*SEQecho*/ (strsub src 8+24 4) /*0 1*/-> rseq in
+		let /*SEQecho*/ (strsub src 8+28 4) /*0 1*/-> rack in
+		if st==STSYN then
 		(
-			if cb==nil then Secholn "callback is nil"
-			else Secholn "callback is not nil";
-			set ltcp=[t cb]::ltcp;
-			call cb [t val msg]
+			Secholn "stsyn";
+			if (flag==TSYN+TACK) && !vstrcmp (SEQecho(t.seqT)0 1) 0 rack 0 4 then
+			(
+				set t.ackT=SEQecho (netSeqAdd rseq 1) 0 1;
+				sendtcp t mktcp t TACK nil;
+				set t.stateT=STEST;
+				set t.lastsentT=nil;
+//				Secholn "call TCPWRITE";
+				call t.cbT [t TCPWRITE nil]
+			)
+			else
+			(
+//				Secholn "TSRT+TACK";
+				sendtcp t mktcp t TRST+TACK nil;
+				remtcp t;
+				nil
+			)
 		)
-	else let listswitch ltcp t -> cb in
-		call cb [t val msg];;
+		else if st==STEST then
+			if !vstrcmp t.ackT 0 rseq 0 4 then
+			let strgetword src 10 -> iplen in
+			let ((strget src 8+32)>>4)<<2 -> tcplen in
+			let datalength src -> datalen in
+			(
+				if datalen then
+				(
+	//				dump src;
+	//				Iecholn iplen;
+	//				Iecholn tcplen;
+//					Secho "update ackT : add ";
+					set t.ackT=netSeqAdd t.ackT datalen
+				);
+				if flag&TFIN then
+				(
+					set t.ackT=netSeqAdd t.ackT 1;
+					nil
+				)
+				else if !vstrcmp t.seqT 0 rack 0 4 then
+				(
+//					Secholn "acquittement de l'envoi";
+					set t.lastsentT=nil;	// acquittement de l'envoi
+					if t.locksendT==1 then
+					(
+						set t.locksendT=0;
+						call t.cbT [t TCPWRITE nil]
+					)
+					else if t.locksendT==2 then
+					(
+						sendclose t;
+						nil
+					)
+				)
+				else (Secholn "##bad ack"; SEQecho t.seqT 0 1;SEQecho rack 0 1; nil);
+				if datalen then
+					let 8+20+headerlen src -> start in
+					let strsub src start datalen -> data in
+					call t.cbT [t TCPREAD data];
+				if datalen || flag&TFIN then sendtcp t mktcp t TACK nil;
+				if flag&TFIN then
+				(
+					sendtcp t mktcp t TFIN+TACK nil;
+					remtcp t;
+					call t.cbT [t TCPCLOSE nil]
+				)
+			)
+			else (/*SEQecho(t.ackT)0 1; SEQecho rseq 0 1;*/Secho "##bs/";sendtcp t mktcp t TACK nil; nil)
+		else if st==STFIN then
+			(
+				Secholn "STFIN";
+				set t.ackT=SEQecho (netSeqAdd rseq 1) 0 1;
+				sendtcp t mktcp t TACK nil;
+				remtcp t;
+				nil
+			)
+		else if st==STLISTEN then
+			if flag&TSYN then
+			(
+				let [stateT:STEST locT:(strsub src 8+16 4) dstT:(strsub src 8+12 4) locpT:locp dstpT:dstp
+				seqT:CLIENT_SEQ_START ackT:(netSeqAdd rseq 1) cbT:t.cbT macT:mac  enableT:1] -> tcp in
+				(
+					set ltcp=tcp::ltcp;
+					sendtcpforretry tcp mktcp tcp TACK+TSYN nil;
+					call tcp.cbT [tcp TCPSTART nil]
+				)
+			)
+	;;
 
-fun startdhcp=0;;
-fun startdhcpserver=0;;
 
-fun nettime=0;;
+fun writetcp t msg i=
+	if t.stateT!=STEST then nil
+	else if t.lastsentT!=nil then
+	(
+//		Secholn "locksend";
+		set t.locksendT=1;
+		i
+	)
+	else let strsub msg i TCPMAX -> content in
+	let mktcp t TACK content -> trame in
+	(
+		sendtcpforretry t trame;
+		let i+strlen content -> ni in
+		(
+			if ni!=strlen msg then set t.locksendT=1;
+			ni
+		)
+	);;
 
-fun netstart=
-	tcpCb #nettcp;
-	udpCb #netudp;
-	set ltcp=nil;
-	set ludp=nil;
-//	set wifi=stationW;
-	set netdns=confGetNetdns;
-	set netdns="\192\168\1\1";
-//	set netdns="\10\0\1\1";
-	set netip="\127\0\0\1";
+
+fun closetcp t=
+	if t.stateT!=STEST then 0
+	else if t.lastsentT!=nil then
+	(
+		set t.locksendT=2;
+		0
+	)
+	else sendclose t;
 	0;;
-// --------------- TCP/UDP EMULATION fin
+
+fun tcpcb t cb= set t.cbT=cb;;
+
+fun enabletcp t v= set t.enableT=v;;
+
+fun tcptime =
+	for l=ltcp;l!=nil;tl l do let hd l-> t in
+	if t.lastsentT!=nil then
+	(
+		if t.retryT!=nil then
+		(
+			set t.retryT=1+t.retryT;
+			if t.retryT>10 then
+			(
+				remtcp t;
+				call t.cbT [t TCPCLOSE nil];
+				nil
+			)
+			else resendtcp t
+		)
+		else set t.retryT=0
+	);
+	0;;
+
+fun resettcp=
+	set ltcp=nil;
+	0;;
+
+// -------------- TDP fin
+
+//------------ END ./lib/net/tcp.mtl ------------
 
 
-// simu
+//------------ BEGIN ./lib/net/udp.mtl ------------
+// ------------- UDP debut
+fun mkudp ipsrc ipdst portsrc portdst content=
+	let strcatlist 
+	"\$aa\$aa\$03\$00\$00\$00\$08\$00\$45\$00\$00\$00\$00\$00\$00\$00\100\17\0\0"::
+	ipsrc::
+	ipdst::
+	"\0\0\0\0\0\0\0\0"::
+	content::
+	nil -> udp in
+	(
+		strputword udp 8+2 28+strlen content;
+		strputword udp 8+20 portsrc;
+		strputword udp 8+22 portdst;
+		strputword udp 8+24 8+strlen content;
+		strputchk udp 8+10 netChk udp 8 20 0;
+		strputchk udp 8+26 netChk udp 8+20 (8+strlen content) netChk udp 8+24 2 netChk "\0\17" 0 nil netChk udp 8+12 8 0;
+		udp
+	);;
+
+fun udpSend2 mac udp=
+	Secho ">u";
+//	dump udp;
+	netSend udp 0 nil (MACecho mac 0 1) 0 1;;
+
+fun udpsend local localp dst dstp content mac=
+	let mkudp local dst localp dstp content -> udp in
+	if mac!=nil then udpSend2 mac udp
+	else let dst -> ip in	//	ajouter le test de passerelle
+	arpreq ip fixarg2 #udpSend2 udp;;
+
+var ludp;;
+
+fun remudp l port=
+	if l!=nil then let hd l ->[p _] in if p==port then remudp tl l port else (hd l)::remudp tl l port;;
+
+fun regudp port cb=
+	set ludp=[port cb]::remudp ludp port;;
+
+fun unregudp port=
+	set ludp=remudp ludp port;;
+
+fun resetudp= set ludp=nil;;
+
+fun cbnetudp src mac=
+	Secho "<u";
+	let Iecholn strgetword src 8+20+2 -> locp in
+	let listswitch ludp locp -> cb in
+	call cb [strsub src 8+20+8 nil mac strsub src 20 4];;
+
+
+// -------------- UDP fin
+
+//------------ END ./lib/net/udp.mtl ------------
 
 
 //------------ BEGIN ./lib/net/dhcp.mtl ------------
@@ -566,6 +916,42 @@ fun startdhcpserver=
 //------------ END ./lib/net/dhcp.mtl ------------
 
 
+//------------ BEGIN ./lib/net/net.mtl ------------
+// --------------- net HOOK debut
+
+fun net src mac=
+	Secho "n ";//MACecho mac 0 1;
+//	dump src;
+	let strget src 7 -> p in
+	(
+		if p==6 then cbnetarp src mac // ARP
+		else if p==0 then
+			let strget src 17 -> ip in
+			if ip==6 then cbnettcp src mac
+			else if ip==17 then cbnetudp src mac;
+		0
+	);
+	// droso comment
+	// buttoncheckevent;
+	0;;
+
+fun netstart=
+	netCb #net;
+	resetarp;
+	resettcp;
+	resetudp;
+	0;;
+
+fun nettime=
+	arptime;
+	tcptime;
+	0;;
+
+// --------------- net HOOK fin
+
+//------------ END ./lib/net/net.mtl ------------
+
+
 //------------ BEGIN ./lib/net/dns.mtl ------------
 // --------------- DNS debut
 fun parsequ s i= let strfind s i "\0" 0 nil -> j in	j+5;;
@@ -662,172 +1048,26 @@ fun startdnsclient=
 //------------ END ./lib/net/dns.mtl ------------
 
 
-//------------ BEGIN ./lib/net/http.mtl ------------
-//------------------- HTTP
-var HTTP_NORMAL=0;;
-var HTTP_STREAM=1;;
-var HTTP_DIRECT=2;;
 
-var HTTP_SOLVE=0;;
-var HTTP_REACH=1;;
-var HTTP_CONNECTED=2;;
+//------------ BEGIN ./lib/const/led.mtl ------------
 
-var lasthttpevent;;
+const RGB_BLACK  = 0x000000 ;;
+const RGB_RED    = 0xff0000 ;;
+const RGB_GREEN  = 0x00ff00 ;;
+const RGB_YELLOW = 0xffff00 ;;
+const RGB_BLUE   = 0x0000ff ;;
+const RGB_VIOLET = 0xff00ff ;;
+const RGB_CYAN   = 0x00ffff ;;
+const RGB_WHITE  = 0xffffff ;;
+const RGB_GRAY   = 0x808080 ;;
+const RGB_ROSE   = 0xff8080 ;;
 
-// type Httpreq contenant l'�tat d'une requ�te
-type Httpreq=[cnxH inputH outputH indexH cbH typeH stateH aliveH];;
-
-// callback de lecture sur la socket d'une requ�te
-fun tcpread cnx input httpreq=
-	if input==nil ||0==strlen input then	// erreur ou fin
-	(	closetcp cnx;	// on ferme la socket
-		if httpreq.typeH==HTTP_NORMAL then call httpreq.cbH [httpreq strcatlist rev httpreq.inputH nil]	// on retourne ce qui a �t� re�u
-		else call httpreq.cbH [httpreq nil]
-	)
-	else
-	(
-//		dump input;
-		set lasthttpevent=time;
-		set httpreq.aliveH=time_ms;
-		if httpreq.typeH==HTTP_NORMAL then set httpreq.inputH=input::httpreq.inputH	// on bufferise ce qui a �t� re�u
-		else if httpreq.typeH==HTTP_DIRECT then
-		(
-			call httpreq.cbH [httpreq input];
-			nil
-		)
-		else let strcat hd httpreq.inputH input -> s in
-		let strstr s "\13\10\13\10" 0 -> i in
-		if i==nil then
-		(
-			set httpreq.inputH=s::nil
-		)
-		else
-		(
-			set httpreq.inputH=nil;
-			set httpreq.typeH=HTTP_DIRECT;
-			call httpreq.cbH [httpreq strsub s 0 i];
-			if i+4<strlen s then call httpreq.cbH [httpreq strsub s i+4 nil];
-			nil
-		);
-		nil
-	);;
-
-// callback d'�criture sur la socket d'une requ�te
-fun tcpwrite cnx httpreq=
-	set httpreq.stateH=HTTP_CONNECTED; 
-	set httpreq.aliveH=time_ms;	
-	if httpreq.outputH!=nil then	// s'il y a des choses � envoyer (notamment la premi�re fois)
-	(
-		set httpreq.indexH=writetcp cnx httpreq.outputH httpreq.indexH;	// envoyer ce qui peut l'�tre
-		if httpreq.indexH==nil then	// si erreur lors de l'envoi
-		(	closetcp cnx;	// on ferme la socket
-			call httpreq.cbH [httpreq nil]	)	// on retourne nil
-		else if httpreq.indexH>=strlen httpreq.outputH then	// sinon si tout a �t� envoy�
-		(	set httpreq.indexH=nil;	// purger les donn�es d'�mission
-			set httpreq.outputH=nil;
-			nil
-		)
-	);;
-
-var http_prefurl="http://";;	// en-t�te normal (mais ici facultatif) d'une requ�te http
-
-fun isip s i=
-	if i>=strlen s then 1
-	else let strget s i -> c in
-	if (c<'0' || c>'9')&&c!='.' then 0
-	else isip s i+1;;
-
-
-// d�couper une url en [host port path].
-// host est de la forme ip:port
-// path ne commence pas par /
-fun cuturl url =
-	if !strcmp (strsub url 0 strlen http_prefurl) http_prefurl then cuturl strsub url strlen http_prefurl strlen url
-	else let strstr url "/" 0 -> i in
-		let if i==nil then url else strsub url 0 i -> addr in
-		let strstr addr ":" 0 -> j in
-		let if j==nil then [addr 80]
-			else [strsub addr 0 j atoi strsub addr j+1 strlen addr] -> [host port] in
-		let if i==nil then "/" else strsub url i strlen url -> path in
-		[host port path];;
-
-fun tcpevent t val msg sock=
-	if val==TCPWRITE then tcpwrite t sock
-	else if val==TCPCLOSE then tcpread t nil sock
-	else tcpread t msg sock;
-	0;;
-
-
-fun httpsendreq ip x=
-	Secho "found ip>>>>>>>>>>>>>>>>>>>>>>>>>"; Secholn ip;
-	let x->[port httpreq] in
-	if ip==nil then (call httpreq.cbH [httpreq nil]; nil)
-	else
-	(
-		set httpreq.cnxH=opentcp netip nil useparamip ip port fixarg4 #tcpevent httpreq;
-		set httpreq.stateH=HTTP_REACH;
-		nil
-	);
-	0;;
-
-
-//##> cr�ation d'une requ�te http
-// param�tres : verb=verbe de la requ�te url=url de la requ�te postdata=donn�es suppl�mentaires (nil si aucune) cb=callback de retour
-fun httprequest verb url postdata cb type=
-//	Secho "HTTPREQUEST url =";Secholn url;
-	let cuturl url ->[host port path] in	// d�codage de l'url de la requ�te
-	let if confGetProxy then strcatlist "http://"::host::":"::(itoa port)::path::nil else path -> path in //Icy-MetaData:1\13\n
-	let strcatlist verb::" "::path::" HTTP/1.0\13\nUser-Agent: MTL\13\nPragma: no-cache\13\nIcy-MetaData:1\13\nHost: "::host::"\13\n"::
-			if postdata==nil then "\13\n"::nil
-			else "Content-length: "::(itoa strlen postdata)::"\13\n\13\n"::postdata::nil
-		-> request in	// cr�ation de la cha�ne requ�te
-	let if confGetProxy then webip confGetProxyip else host -> host in
-	let if confGetProxy then confGetProxyport else port -> port in
-	let [outputH:request indexH:0 cbH:cb typeH:type stateH:HTTP_SOLVE aliveH:time_ms] -> httpreq in	// cr�ation de la structure requ�te
-	(
-//		Secho "HTTPREQUEST host =";Secholn host;
-		if isip host 0 then httpsendreq host [port httpreq]
-		else
-		(
-			dnsreq host fixarg2 #httpsendreq [port httpreq];
-			nil
-		);
-		httpreq	// on retourne la structure requ�te pour pouvoir �ventuellement l'interrompre en cours de route
-	);;
-
-//##> interruption d'une requ�te en cours
-fun httpabort httpreq=
-	closetcp httpreq.cnxH;;	// on ferme la socket de la requ�te
-
-fun httpenable httpreq v=
-	enabletcp httpreq.cnxH v;;
-
-fun httpstate httpreq = httpreq.stateH;;
-
-fun httpinactive httpreq = time_ms-httpreq.aliveH;;
-
-
-var http_sep="\13\n\13\n";;	// s�parateur entre l'en-t�te et le corps de la r�ponse � une requ�te
-
-	
-
-//##> retourne le header d'une r�ponse � une requ�te
-fun httpgetheader res =
-	let strstr res http_sep 0 -> i in
-	if i==nil then res
-	else strsub res 0 i+strlen http_sep;;
-
-//##> retourne le contenu d'une r�ponse � une requ�te (sans header)
-fun httpgetcontent res =
-	let strstr res http_sep 0 -> i in
-	if i==nil then nil
-	else strsub res i+strlen http_sep strlen res;;
-
-//-------------------
-
-//------------ END ./lib/net/http.mtl ------------
-
-//------------ END ./lib/net/simu.mtl ------------
+const LED_NOSE = 0 ;;
+const LED_BODY_LEFT = 1 ;;
+const LED_BODY_MIDDLE = 2 ;;
+const LED_BODY_RIGHT = 3 ;;
+const LED_BASE = 4 ;;
+//------------ END ./lib/const/led.mtl ------------
 
 
 //------------ BEGIN ./server.mtl ------------
@@ -836,7 +1076,6 @@ fun httpgetcontent res =
 // TCP Socket Server
 //--------------------------------------------------------------------------------------------------
 
-
 fun tcpread cnx input=
     Secholn "receive -------";
     Secholn input;
@@ -844,43 +1083,30 @@ fun tcpread cnx input=
     
     let strsub input 5 1 -> idx in
     let strcatlist "pong "::idx::nil -> data in 
-    writetcp cnx data nil;
+    writetcp cnx data 0;
     nil
     ;;
 
 fun tcpevent cnx val msg=
-    Iecholn val;
     if val==TCPSTART || val==TCPREAD then tcpread cnx msg
     else if val==TCPCLOSE then (
-        Secholn "closing socket";
-        closetcp cnx;
-        reboot 0x0407FE58 0x13fb6754
+        // when using the simulator, when reconnecting after a socket is closed
+        // the system closes the connection, this is not an issue on real hardware
+        closetcp cnx
     );
     0;;
 
 fun cbsrv cnx code msg=
-    Secholn "========= NEW CONNECTION ================";
     tcpcb cnx #tcpevent;
     0;;
 
 fun startsocketserver port=
     listentcp port #cbsrv;
-    Secholn "starthttpsrv";
+    led LED_NOSE RGB_BLUE;
+    Secholn "start socket server";
     0;;
 
 //------------ END ./server.mtl ------------
-
-
-var pingurl = "http://192.168.1.102/vl/hello";;
-
-fun _pingcbhttp http res=
-	Secholn "ping=";
-    Secholn res;
-	0;;
-
-fun runpingstart=
-	httprequest "GET" Secholn pingurl nil #_pingcbhttp HTTP_NORMAL;
-	0;;
 
 fun loop=
     Secholn "test";
@@ -892,7 +1118,6 @@ fun main=
     netstart;
     startdnsclient;
     startsocketserver 5000;
-    //runpingstart;
     //loopcb #loop;
     Secholn "hello world ------------";
     0;;

@@ -14,7 +14,7 @@ Max Size is x
 |--|--|--|
 |01|Reboot||
 |02|Ear|Get/Set ear position|[Ear (left: 0, right: 1, both: 2); position (00-16)]|
-|03|Led|Set led|[Led (5 digits: 1 to use, 0 to ignore, order: bottom, left, center, right, nose); Color Hex color code (6 characters, 000000 for off); Blinking Speed (0 to stay fixed, or time interval in miliseconds) ]|
+|03|Led|Set led|[Led (5 digits: 1 to use, 0 to ignore, order: nose, left, center, right, bottom); Color Hex color code (6 characters, 000000 for off); Blinking Speed (0 to stay fixed, or time interval in miliseconds) ]|
 |04|Button event|Type (1: click, 2: double click, 3: long click)|
 |05|Rfid Read|rfid id|
 |06|Recorder|Type (0: stop, 1: start, 2: volume); Volume (only for type 2, percentage on 3 digits)|

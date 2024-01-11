@@ -1,25 +1,31 @@
-proto main 0;;
+//#define SIMU
 
-var SIMU;;
+proto main 0;;
 var NOMINAL;;
 
 #include lib/std/utils.mtl
 #include lib/std/debug.mtl
 #include lib/const/config.mtl
+
+#ifdef SIMU
+var SIMU;;
 #include lib/net/simu.mtl
+#include lib/net/dhcp.mtl
+#include lib/net/dns.mtl
+#endif
+
+#ifndef SIMU
+#include lib/net/arp.mtl
+#include lib/net/ip.mtl
+#include lib/net/tcp.mtl
+#include lib/net/udp.mtl
+#include lib/net/dhcp.mtl
+#include lib/net/net.mtl
+#include lib/net/dns.mtl
+#endif
+
+#include lib/const/led.mtl
 #include server.mtl
-
-
-var pingurl = "http://192.168.1.102/vl/hello";;
-
-fun _pingcbhttp http res=
-	Secholn "ping=";
-    Secholn res;
-	0;;
-
-fun runpingstart=
-	httprequest "GET" Secholn pingurl nil #_pingcbhttp HTTP_NORMAL;
-	0;;
 
 fun loop=
     Secholn "test";
@@ -31,7 +37,6 @@ fun main=
     netstart;
     startdnsclient;
     startsocketserver 5000;
-    //runpingstart;
     //loopcb #loop;
     Secholn "hello world ------------";
     0;;

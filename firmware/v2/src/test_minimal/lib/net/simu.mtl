@@ -1,14 +1,3 @@
-
-// real
-//#include arp.mtl
-//#include ip.mtl
-//#include tcp.mtl
-//#include udp.mtl
-//#include dhcp.mtl
-//#include net.mtl
-//#include dns.mtl
-//#include http.mtl
-
 // --------------- TCP/UDP EMULATION debut
 
 var TCPWRITE=0;;
@@ -96,9 +85,3 @@ fun netstart=
 	set netip="\127\0\0\1";
 	0;;
 // --------------- TCP/UDP EMULATION fin
-
-
-// simu
-#include dhcp.mtl
-#include dns.mtl
-#include http.mtl
