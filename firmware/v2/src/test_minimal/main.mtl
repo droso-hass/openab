@@ -30,7 +30,7 @@ fun main=
     confInit;
     netstart;
     startdnsclient;
-    startwebserver 5000;
+    startsocketserver 5000;
     //runpingstart;
     //loopcb #loop;
     Secholn "hello world ------------";

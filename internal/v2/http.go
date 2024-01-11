@@ -21,7 +21,7 @@ import (
 func SetupRoutes(r *chi.Mux) {
 	r.Mount("/vl/bc.jsp", test())
 	r.Mount("/vl/hello", hello())
-	connect("192.168.1.102:5000")
+	connect("127.0.0.1:5000")
 }
 
 func test() http.HandlerFunc {

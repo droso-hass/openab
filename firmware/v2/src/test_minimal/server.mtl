@@ -3,32 +3,34 @@
 // TCP Socket Server
 //--------------------------------------------------------------------------------------------------
 
-
 fun tcpread cnx input=
     Secholn "receive -------";
     Secholn input;
     Iecholn cnx;
     
     let strsub input 5 1 -> idx in
-    let strcatlist "pong "::idx::nil -> ret in 
-    writetcp cnx ret nil;
+    let strcatlist "pong "::idx::nil -> data in 
+    writetcp cnx data nil;
     nil
     ;;
 
 fun tcpevent cnx val msg=
-    if val==TCPREAD then tcpread cnx msg
+    if val==TCPSTART || val==TCPREAD then tcpread cnx msg
     else if val==TCPCLOSE then (
-        Secholn "closing socket";
-        closetcp cnx
+        // not sure why but when reconnecting after a socket is closed
+        // the system closes the connection
+        // to prevent that, we reboot after each closetcp
+        Secholn "closing socket, rebooting ..."
+        closetcp cnx;
+        reboot 0x0407FE58 0x13fb6754
     );
     0;;
 
 fun cbsrv cnx code msg=
-    Secholn "========= NEW CONNECTION ================";
     tcpcb cnx #tcpevent;
     0;;
 
 fun startsocketserver port=
     listentcp port #cbsrv;
-    Secholn "starthttpsrv";
+    Secholn "start socket server";
     0;;

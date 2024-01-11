@@ -836,80 +836,37 @@ fun httpgetcontent res =
 // TCP Socket Server
 //--------------------------------------------------------------------------------------------------
 
-type Sock=[sockInput sockOutput sockIndex sockCloseAfter sockCallback];;
 
-fun tcpwrite cnx sock=
-    if sock.sockOutput!=nil then
-    (
-        if sock.sockIndex==nil then set sock.sockIndex=0;
-        Iecholn set sock.sockIndex=writetcp cnx sock.sockOutput Iecholn sock.sockIndex;
-        if sock.sockIndex!=nil && sock.sockIndex>=strlen sock.sockOutput then
-        (   set sock.sockIndex=nil;
-            set sock.sockOutput=nil;
-            if sock.sockCloseAfter==1 then closetcp cnx
-        )
-    );
-    0;;
-
-fun tcpsend cnx sock s =
-    set sock.sockOutput=strcat sock.sockOutput s;
-    tcpwrite cnx sock;;
-
-fun tcpread cnx input sock=
+fun tcpread cnx input=
     Secholn "receive -------";
-    if input==nil ||0==strlen input then
-    (
-        // close socket when server closes it
+    Secholn input;
+    Iecholn cnx;
+    
+    let strsub input 5 1 -> idx in
+    let strcatlist "pong "::idx::nil -> data in 
+    writetcp cnx data nil;
+    nil
+    ;;
+
+fun tcpevent cnx val msg=
+    Iecholn val;
+    if val==TCPSTART || val==TCPREAD then tcpread cnx msg
+    else if val==TCPCLOSE then (
         Secholn "closing socket";
         closetcp cnx;
-        //tcpsend cnx sock "test2";
-        nil
-    )
-    else
-    (
-        Secholn input;
-        Iecholn cnx;
-
-        set sock.sockInput=input::sock.sockInput;
-        
-        let strsub input 5 1 -> idx in
-        let strcatlist "pong "::idx::nil -> ret in 
-        let call sock.sockCallback [ret] -> res in
-        (
-            tcpsend cnx sock res
-        )
+        reboot 0x0407FE58 0x13fb6754
     );
     0;;
 
-fun tcpevent cnx val msg sock=
-    if val==TCPWRITE then tcpwrite cnx sock
-    else if val==TCPCLOSE then tcpread cnx nil sock
-    else tcpread cnx msg sock;;
-
-fun cbsrv cnx code msg cbrequest=
-    Secholn "httpsrv accept";
-    let [sockCallback:cbrequest]-> sock in
-    (
-        tcpcb cnx fixarg4 #tcpevent sock;
-        0
-    );;
-
-fun starthttpsrv port cbrequest=
-    listentcp port fixarg4 #cbsrv cbrequest;
-    Secholn "starthttpsrv";
+fun cbsrv cnx code msg=
+    Secholn "========= NEW CONNECTION ================";
+    tcpcb cnx #tcpevent;
     0;;
 
-//--------------------------------------------------------------------------------------------------
-
-fun cbhttp req=
-    Secholn "req=======================";
-    Secholn req;;
-
-
-fun startwebserver port =
-    // Secho jsonstatus;
-    starthttpsrv port #cbhttp;;
-
+fun startsocketserver port=
+    listentcp port #cbsrv;
+    Secholn "starthttpsrv";
+    0;;
 
 //------------ END ./server.mtl ------------
 
@@ -934,7 +891,7 @@ fun main=
     confInit;
     netstart;
     startdnsclient;
-    startwebserver 5000;
+    startsocketserver 5000;
     //runpingstart;
     //loopcb #loop;
     Secholn "hello world ------------";
