@@ -2,15 +2,72 @@
 //--------------------------------------------------------------------------------------------------
 // TCP Socket Server
 //--------------------------------------------------------------------------------------------------
+fun dumpList l0=
+  for l=l0;l!=nil;tl l do (Secho hd l; Secho "::");
+  Secholn "nil";;
+
+fun split data separator lst =
+  let strlen data -> len in
+  let strstr data separator 0 -> idx in
+  let strsub data 0 idx -> a in
+  let strsub data idx+1 len-idx-1 -> b in
+    if idx == nil then data::lst
+    else split b separator a::lst;;
 
 fun tcpread cnx input=
-    Secholn "receive -------";
-    Secholn input;
-    Iecholn cnx;
-    
-    let strsub input 5 1 -> idx in
-    let strcatlist "pong "::idx::nil -> data in 
-    writetcp cnx data 0;
+  for l=split input "\n" nil; l!=nil; tl l do (
+    let hd l -> msg in
+    let strsub msg 0 2 -> pktType in
+        if !strcmp pktType "01" then
+        (
+          reboot 0x0407FE58 0x13fb6754;
+          0
+        )
+        else if !strcmp pktType "02" then
+        (
+          earHandler strsub msg 3 nil;
+          0
+        )
+        else if !strcmp pktType "03" then
+        (
+          ledHandler strsub msg 3 nil;
+          0
+        )
+        else if !strcmp pktType "06" then
+        (
+          recorderHandler strsub msg 3 nil;
+          0
+        )
+        else if !strcmp pktType "07" then
+        (
+          playerHandler strsub msg 3 nil;
+          0
+        )
+        else if !strcmp pktType "08" then
+        (
+          recordDataHandler strsub msg 3 nil;
+          0
+        )
+        else if !strcmp pktType "09" then
+        (
+          playDataHandler strsub msg 3 nil;
+          0
+        )
+        else if !strcmp pktType "11" then
+        (
+          midiHandler strsub msg 3 nil;
+          0
+        )
+        else
+        (
+          Secholn pktType;
+          Secholn "unknown packet";
+          0
+        )
+  );
+
+    //let strcatlist "pong "::idx::nil -> data in 
+    //writetcp cnx data 0;
     nil
     ;;
 
@@ -29,6 +86,10 @@ fun cbsrv cnx code msg=
 
 fun startsocketserver port=
     listentcp port #cbsrv;
-    led LED_NOSE RGB_BLUE;
+    // led LED_NOSE RGB_BLUE;
     Secholn "start socket server";
+    //let "a;b;cde;fg;hh\nquoi;coubeh\nbo;zuf;gluf" -> msg in
+    //  for l=split msg "\n" nil; l!=nil; tl l do (
+    //    dumpList rev split hd l ";" nil nil
+    //  );
     0;;

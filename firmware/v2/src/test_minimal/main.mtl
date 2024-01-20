@@ -1,4 +1,4 @@
-//#define SIMU
+#define SIMU
 
 proto main 0;;
 var NOMINAL;;
@@ -25,10 +25,17 @@ var SIMU;;
 #endif
 
 #include lib/const/led.mtl
+#include led.mtl
+#include handlers.mtl
 #include server.mtl
 
-fun loop=
-    Secholn "test";
+fun mainSetup = 
+    ledInit;
+    Secholn "test";;
+
+fun mainLoop = 
+    ledLoop;
+    //Secholn "loop";
     0;;
 
 fun main=
@@ -36,7 +43,8 @@ fun main=
     confInit;
     netstart;
     startdnsclient;
+    mainSetup;
     startsocketserver 5000;
-    //loopcb #loop;
+    loopcb #mainLoop;
     Secholn "hello world ------------";
     0;;

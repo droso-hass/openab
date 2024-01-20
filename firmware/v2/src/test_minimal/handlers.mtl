@@ -1,0 +1,21 @@
+
+// --------------------------- net handlers ---------------------------
+
+
+fun earHandler data = 
+    Secholn data;;
+
+fun recorderHandler data = 
+    Secholn data;;
+
+fun playerHandler data = 
+    Secholn data;;
+
+fun recordDataHandler data = 
+    Secholn data;;
+
+fun playDataHandler data = 
+    Secholn data;;
+
+fun midiHandler data = 
+    Secholn data;;

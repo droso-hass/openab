@@ -2,49 +2,44 @@ package v2
 
 import (
 	"fmt"
-	"log/slog"
 	"net"
-	"strconv"
-	"time"
 )
 
-var conns = map[string]nab{}
+type NabConn struct {
+	addr string
+	conn net.Conn
+	stop bool
+}
 
-func connect(req string) error {
-	// if a connection is already open, close it
-	c, ok := conns[req]
-	if ok {
-		c.conn.Close()
+func New(addr string) *NabConn {
+	return &NabConn{
+		addr: addr,
+		stop: false,
 	}
+}
 
-	slog.Info("connecting to " + req)
-	conn, err := net.Dial("tcp", req)
+func (n *NabConn) Disconnect() error {
+	n.stop = true
+	return n.conn.Close()
+}
+
+func (n *NabConn) Connect() error {
+	conn, err := net.Dial("tcp", n.addr)
 	if err != nil {
 		return err
 	}
+	n.stop = false
+	n.conn = conn
 
 	// reading loop
 	go func() {
-		for {
+		for !n.stop {
 			fmt.Println("reading ...")
-			buf := make([]byte, 1024)
-			conn.Read(buf)
-			fmt.Println(string(buf))
-
-		}
-	}()
-
-	// test writing loop
-	go func() {
-		i := 0
-		for {
-			time.Sleep(2 * time.Second)
-			_, err = conn.Write([]byte("ping " + strconv.Itoa(i)))
-			if err != nil {
-				fmt.Println(err)
-				return
+			buf := make([]byte, 2048)
+			_, err := conn.Read(buf)
+			if err == nil {
+				n.processNabMessage(buf)
 			}
-			i++
 		}
 	}()
 

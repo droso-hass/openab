@@ -1,0 +1,40 @@
+
+const RGB_BLACK = 0x000000;;
+type Led=[color on time interval];;
+var leds;;
+
+// --------------------------- init ---------------------------
+fun ledInit = 
+    set leds = tabnew nil 5;
+    for i = 0; i < 5 do (
+        set leds.i = [color: RGB_BLACK on:0 time:time_ms interval:0];
+        led i RGB_BLACK
+    );;
+
+fun ledHandler data = 
+    let htoi strsub data 5 6 -> color in
+    let atoi strsub data 11 nil -> timer in
+    let [color: color on:1 time:time_ms interval:timer] -> enableLed in (
+        if !strcmp strsub data 0 1 "1" then set leds.0 = enableLed;
+        if !strcmp strsub data 1 1 "1"  then set leds.1 = enableLed;
+        if !strcmp strsub data 2 1 "1"  then set leds.2 = enableLed;
+        if !strcmp strsub data 3 1 "1"  then set leds.3 = enableLed;
+        if !strcmp strsub data 4 1 "1"  then set leds.4 = enableLed
+    );;
+
+
+fun ledLoop = 
+    let time_ms -> now in
+    for i = 0; i < 5 do (
+        let leds.i -> l in
+        if l.interval != 0 && now-l.time >= l.interval then (
+            if l.on == 0 then (
+                led i l.color;
+                set leds.i = [color: l.color on:1 time:now interval:l.interval]
+            )
+            else (
+                led i RGB_BLACK;
+                set leds.i = [color: l.color on:0 time:now interval:l.interval]
+            )
+        )
+    );;
