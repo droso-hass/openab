@@ -1,8 +1,11 @@
 package v2
 
 import (
+	"bufio"
+	"log"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/droso-hass/openab/internal/utils"
@@ -49,12 +52,22 @@ func bootcode() http.HandlerFunc {
 				conns[q.Get("m")] = &c
 			}
 
-			time.Sleep(time.Second * 2)
-			conns[q.Get("m")].write("030100000FF003000")
-			time.Sleep(time.Second * 1)
-			conns[q.Get("m")].write("030010000FF003000")
-			time.Sleep(time.Second * 1)
-			conns[q.Get("m")].write("030001000FF003000")
+			reader := bufio.NewReader(os.Stdin)
+			for {
+				str, err := reader.ReadString('\n')
+				if err != nil {
+					log.Fatal(err)
+				}
+				conns[q.Get("m")].write(str)
+			}
+			/*
+				time.Sleep(time.Second * 2)
+				green_breath := "03;4;0;00FF00;100;00EE00;100;00DD00;100;00CC00;100;00BB00;100;00AA00;100;009900;100;008800;100;007700;100;006600;100;005500;100;004400;100;003300;100;002200;100;001100;100;000000;100;001100;100;002200;100;003300;100;004400;100;005500;100;006600;100;007700;100;008800;100;009900;100;00AA00;100;00BB00;100;00CC00;100;00DD00;100;00EE00;100"
+				conns[q.Get("m")].write(green_breath)
+				time.Sleep(time.Second * 1)
+				conns[q.Get("m")].write("030010000FF003000")
+				time.Sleep(time.Second * 1)
+				conns[q.Get("m")].write("030001000FF003000")*/
 		}()
 	}
 }

@@ -1,7 +1,6 @@
 package v2
 
 import (
-	"fmt"
 	"net"
 )
 
@@ -34,7 +33,7 @@ func (n *NabConn) Connect() error {
 	// reading loop
 	go func() {
 		for !n.stop {
-			fmt.Println("reading ...")
+			//fmt.Println("reading ...")
 			buf := make([]byte, 2048)
 			_, err := conn.Read(buf)
 			if err == nil {
