@@ -2,21 +2,11 @@
 //--------------------------------------------------------------------------------------------------
 // TCP Socket Server
 //--------------------------------------------------------------------------------------------------
-fun dumpList l0=
-  for l=l0;l!=nil;tl l do (Secho hd l; Secho "::");
-  Secholn "nil";;
-
-fun split data separator lst =
-  let strlen data -> len in
-  let strstr data separator 0 -> idx in
-  let strsub data 0 idx -> a in
-  let strsub data idx+1 len-idx-1 -> b in
-    if idx == nil then data::lst
-    else split b separator a::lst;;
 
 fun tcpread cnx input=
   for l=split input "\n" nil; l!=nil; tl l do (
     let hd l -> msg in
+    let time_ms -> t in
     let strsub msg 0 2 -> pktType in
         if !strcmp pktType "01" then
         (
@@ -30,7 +20,7 @@ fun tcpread cnx input=
         )
         else if !strcmp pktType "03" then
         (
-          ledHandler strsub msg 3 nil;
+          ledHandler strsub msg 3 nil t;
           0
         )
         else if !strcmp pktType "06" then

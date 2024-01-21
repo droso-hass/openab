@@ -1,40 +1,50 @@
 
 const RGB_BLACK = 0x000000;;
-type Led=[color on time interval];;
+type Led=[next_change index size colors intervals];;
 var leds;;
 
-// --------------------------- init ---------------------------
 fun ledInit = 
     set leds = tabnew nil 5;
     for i = 0; i < 5 do (
-        set leds.i = [color: RGB_BLACK on:0 time:time_ms interval:0];
+        set leds.i = [next_change: -1 index: 0 size: 1 colors: {RGB_BLACK} intervals: {0}];
         led i RGB_BLACK
     );;
 
-fun ledHandler data = 
-    let htoi strsub data 5 6 -> color in
-    let atoi strsub data 11 nil -> timer in
-    let [color: color on:1 time:time_ms interval:timer] -> enableLed in (
-        if !strcmp strsub data 0 1 "1" then set leds.0 = enableLed;
-        if !strcmp strsub data 1 1 "1"  then set leds.1 = enableLed;
-        if !strcmp strsub data 2 1 "1"  then set leds.2 = enableLed;
-        if !strcmp strsub data 3 1 "1"  then set leds.3 = enableLed;
-        if !strcmp strsub data 4 1 "1"  then set leds.4 = enableLed
-    );;
+fun ledHandler data t =
+    let rev split data ";" nil nil -> c1 in
+    let atoi hd c1 -> led_id in
+    let tl c1 -> c2 in
+    let atoi hd c2 -> start_after in
+    let tl c2 -> c3 in
+    let (listlen c3) / 2 -> size in
+    let tabnew nil size -> colors in
+    let tabnew nil size -> intervals in
+    let 0 -> cpt in (
+        for l=c3; l!=nil; tl tl l do (
+            set colors.cpt = htoi hd l;
+            set intervals.cpt = atoi hd tl l;
+            set cpt = cpt+1
+        );
+        set leds.led_id = [next_change: t+start_after index: 0 size: size colors: colors intervals: intervals]
+    );
+    /*let leds.1 -> l in (
+        Iecholn l.size;
+        Iecholn l.index;
+        for i = 0; i<l.size do Iecholn l.colors.i
+    );*/
+    0;;
 
-
-fun ledLoop = 
-    let time_ms -> now in
+fun ledLoop =
     for i = 0; i < 5 do (
-        let leds.i -> l in
-        if l.interval != 0 && now-l.time >= l.interval then (
-            if l.on == 0 then (
-                led i l.color;
-                set leds.i = [color: l.color on:1 time:now interval:l.interval]
+        let leds.i -> l in (
+            if l.next_change != -1 && time_ms >= l.next_change then (
+                let l.index -> j in (
+                    led i l.colors.j;
+                    if l.intervals.j == 0 then 
+                        set leds.i = [next_change: -1 index: 0 size: l.size colors: l.colors intervals: l.intervals]
+                    else
+                        set leds.i = [next_change: time_ms+l.intervals.j index: (j+1)%l.size size: l.size colors: l.colors intervals: l.intervals]
+                )
             )
-            else (
-                led i RGB_BLACK;
-                set leds.i = [color: l.color on:0 time:now interval:l.interval]
-            )
-        )
+        ) 
     );;
