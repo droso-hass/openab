@@ -9,3 +9,10 @@ fun split data separator lst =
   let strsub data idx+1 len-idx-1 -> b in
     if idx == nil then data::lst
     else split b separator a::lst;;
+
+var conn;;
+
+fun writetcpconn data = 
+  for l=conn;l!=nil;tl l do 
+    writetcp hd l data 0
+  ;;

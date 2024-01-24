@@ -15,7 +15,7 @@ fun tcpread cnx input=
         )
         else if !strcmp pktType "02" then
         (
-          earHandler strsub msg 3 nil;
+          earHandler strsub msg 3 nil t;
           0
         )
         else if !strcmp pktType "03" then
@@ -62,8 +62,12 @@ fun tcpread cnx input=
     ;;
 
 fun tcpevent cnx val msg=
-    if val==TCPSTART || val==TCPREAD then tcpread cnx msg
+    if val==TCPSTART then (
+      set conn = cnx::conn;
+      tcpread cnx msg
+    ) else if val==TCPREAD then tcpread cnx msg
     else if val==TCPCLOSE then (
+        set conn = remfromlist conn cnx;
         // when using the simulator, when reconnecting after a socket is closed
         // the system closes the connection, this is not an issue on real hardware
         closetcp cnx

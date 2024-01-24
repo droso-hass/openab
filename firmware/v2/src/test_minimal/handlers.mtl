@@ -1,10 +1,6 @@
 
 // --------------------------- net handlers ---------------------------
 
-
-fun earHandler data = 
-    Secholn data;;
-
 fun recorderHandler data = 
     Secholn data;;
 
