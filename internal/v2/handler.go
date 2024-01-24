@@ -1,5 +1,7 @@
 package v2
 
-func (n *NabConn) processNabMessage(data []byte) {
+import "fmt"
 
+func (n *NabConn) processNabMessage(data []byte) {
+	fmt.Println(string(data))
 }

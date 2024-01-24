@@ -1,4 +1,3 @@
-#define SIMU
 
 proto main 0;;
 var NOMINAL;;
@@ -27,18 +26,22 @@ var SIMU;;
 #include utils.mtl
 #include led.mtl
 #include ear.mtl
+#include events.mtl
 #include handlers.mtl
 #include server.mtl
 
 fun mainSetup = 
     ledInit;
     earInit;
+    eventsInit;
     Secholn "test";;
 
 fun mainLoop = 
-    ledLoop;
+    //ledLoop;
     earLoop;
-    Secholn "loop";
+    buttonLoop;
+    rfidLoop;
+    //Secholn "loop";
     0;;
 
 fun main=

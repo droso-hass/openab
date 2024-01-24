@@ -13,6 +13,14 @@ fun split data separator lst =
 var conn;;
 
 fun writetcpconn data = 
-  for l=conn;l!=nil;tl l do 
+  /*for l=conn;l!=nil;tl l do (
+    led 0 0x00FF00;
     writetcp hd l data 0
+  )*/
+  writetcp conn data 0
   ;;
+
+fun _strtohex key i=
+  if i < strlen key then (ctoh strget key i)::_strtohex key i+1;;
+fun strtohex key=
+  strcatlist _strtohex key 0;;

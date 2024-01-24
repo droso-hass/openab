@@ -25,13 +25,15 @@ var conns = map[string]*NabConn{}
 
 func SetupRoutes(r *chi.Mux) {
 	r.Mount("/vl/bc.jsp", bootcode())
-	c := New("127.0.0.1:5000")
+	/*c := New("127.0.0.1:5000")
 	e := c.Connect()
 	if e != nil {
 		log.Fatal(e)
 	}
 	//c.write("03;4;0;00ff00;100;00f200;100")
 	c.write("02;1;0;7;1;0")
+	// 02;0;0;8;1;0 02;1;0;7;1;0
+	*/
 }
 
 func bootcode() http.HandlerFunc {
