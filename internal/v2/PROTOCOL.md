@@ -12,18 +12,18 @@ Max Size is x
 
 |Type|Description|Data|
 |--|--|--|
+|00|Ping|ping|
 |01|Reboot||
-|02|Ear|Set ear position|[Ear (left: 0, right: 1); Start After (start sequence only after x ms);position (00-16); direction (0/1); Time (interval in miliseconds);]|
-|03|Led|Set led|[Led (id from 0 to 4: nose, left, center, right, bottom); Start After (start sequence only after x ms); Color Hex color code (6 characters, 000000 for off); Time (0 to stay fixed, or time interval in miliseconds); ]|
+|02|Ear|[Ear (left: 0, right: 1); Start After (start sequence only after x ms);position (00-16); direction (0/1); Time (interval in miliseconds);]|
+|03|Led|[Led (id from 0 to 4: nose, left, center, right, bottom); Start After (start sequence only after x ms); Color Hex color code (6 characters, 000000 for off); Time (0 to stay fixed, or time interval in miliseconds); ]|
 |04|Button event|Type (1: click, 2: double click, 3: long click)|
 |05|Rfid Read|rfid id|
-|06|Recorder|Type (0: stop, 1: start, 2: volume); Volume (only for type 2, percentage on 3 digits)|
-|07|Player|Type (0: stop, 1: start, 2: volume); Volume (only for type 2, percentage on 3 digits)|
+|06|Recorder|Type (0: stop, 1: start)|
+|07|Player|Type (0: stop, 1: start, 2: volume); Volume (only for type 2, percentage); Linkto media (only for type 1)|
 |08|Record Data|audio chunk|
-|09|Player Data|audio chunk|
+|09|Play Midi|bytes|
 |10|Wheel status|Value (0-255)|
-|11|Play Midi|bytes|
-|12|Ear State Change|[Ear ID; position (0-16)]
+|11|Ear State Change|[Ear ID; position (0-16)]|
 
 
 Led example:

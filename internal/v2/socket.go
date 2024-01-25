@@ -2,12 +2,14 @@ package v2
 
 import (
 	"net"
+	"os"
 )
 
 type NabConn struct {
-	addr string
-	conn net.Conn
-	stop bool
+	addr    string
+	conn    net.Conn
+	stop    bool
+	recFile *os.File
 }
 
 func New(addr string) *NabConn {

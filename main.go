@@ -30,6 +30,8 @@ func main() {
 
 	v2.SetupRoutes(r)
 
+	utils.ServeStatic(r, "/data", http.Dir("./static"))
+
 	fmt.Println("Ready !")
 	err := http.ListenAndServe(":80", r)
 	log.Fatal(err)

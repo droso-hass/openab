@@ -1,0 +1,21 @@
+
+var isRecording;;
+var recBuf;;
+
+fun cbrec s = 
+    Secholn "rec cb";
+    //adp2wav recBuf 0 s 0 256;
+    writetcpconn strcatlist "08;"::(strtohex s)::nil;;
+
+fun recorderHandler data = 
+    let rev split data ";" nil nil -> x in
+    let atoi hd x -> tp in
+        if tp == 0 && isRecording > 0 then (
+            // stop
+            Secholn "recording stopped";
+            recStop
+        ) else if tp == 1 && isRecording <= 0 then (
+            // start
+            Secholn "recording ...";
+            recStart 8000 0 #cbrec
+        );;

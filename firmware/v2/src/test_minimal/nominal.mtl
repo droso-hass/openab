@@ -1048,6 +1048,375 @@ fun startdnsclient=
 
 
 
+//------------ BEGIN ./lib/net/http.mtl ------------
+//------------------- HTTP
+var HTTP_NORMAL=0;;
+var HTTP_STREAM=1;;
+var HTTP_DIRECT=2;;
+
+var HTTP_SOLVE=0;;
+var HTTP_REACH=1;;
+var HTTP_CONNECTED=2;;
+
+var lasthttpevent;;
+
+// type Httpreq contenant l'�tat d'une requ�te
+type Httpreq=[cnxH inputH outputH indexH cbH typeH stateH aliveH];;
+
+// callback de lecture sur la socket d'une requ�te
+fun tcpread cnx input httpreq=
+	if input==nil ||0==strlen input then	// erreur ou fin
+	(	closetcp cnx;	// on ferme la socket
+		if httpreq.typeH==HTTP_NORMAL then call httpreq.cbH [httpreq strcatlist rev httpreq.inputH nil]	// on retourne ce qui a �t� re�u
+		else call httpreq.cbH [httpreq nil]
+	)
+	else
+	(
+//		dump input;
+		set lasthttpevent=time;
+		set httpreq.aliveH=time_ms;
+		if httpreq.typeH==HTTP_NORMAL then set httpreq.inputH=input::httpreq.inputH	// on bufferise ce qui a �t� re�u
+		else if httpreq.typeH==HTTP_DIRECT then
+		(
+			call httpreq.cbH [httpreq input];
+			nil
+		)
+		else let strcat hd httpreq.inputH input -> s in
+		let strstr s "\13\10\13\10" 0 -> i in
+		if i==nil then
+		(
+			set httpreq.inputH=s::nil
+		)
+		else
+		(
+			set httpreq.inputH=nil;
+			set httpreq.typeH=HTTP_DIRECT;
+			call httpreq.cbH [httpreq strsub s 0 i];
+			if i+4<strlen s then call httpreq.cbH [httpreq strsub s i+4 nil];
+			nil
+		);
+		nil
+	);;
+
+// callback d'�criture sur la socket d'une requ�te
+fun tcpwrite cnx httpreq=
+	set httpreq.stateH=HTTP_CONNECTED; 
+	set httpreq.aliveH=time_ms;	
+	if httpreq.outputH!=nil then	// s'il y a des choses � envoyer (notamment la premi�re fois)
+	(
+		set httpreq.indexH=writetcp cnx httpreq.outputH httpreq.indexH;	// envoyer ce qui peut l'�tre
+		if httpreq.indexH==nil then	// si erreur lors de l'envoi
+		(	closetcp cnx;	// on ferme la socket
+			call httpreq.cbH [httpreq nil]	)	// on retourne nil
+		else if httpreq.indexH>=strlen httpreq.outputH then	// sinon si tout a �t� envoy�
+		(	set httpreq.indexH=nil;	// purger les donn�es d'�mission
+			set httpreq.outputH=nil;
+			nil
+		)
+	);;
+
+var http_prefurl="http://";;	// en-t�te normal (mais ici facultatif) d'une requ�te http
+
+fun isip s i=
+	if i>=strlen s then 1
+	else let strget s i -> c in
+	if (c<'0' || c>'9')&&c!='.' then 0
+	else isip s i+1;;
+
+
+// d�couper une url en [host port path].
+// host est de la forme ip:port
+// path ne commence pas par /
+fun cuturl url =
+	if !strcmp (strsub url 0 strlen http_prefurl) http_prefurl then cuturl strsub url strlen http_prefurl strlen url
+	else let strstr url "/" 0 -> i in
+		let if i==nil then url else strsub url 0 i -> addr in
+		let strstr addr ":" 0 -> j in
+		let if j==nil then [addr 80]
+			else [strsub addr 0 j atoi strsub addr j+1 strlen addr] -> [host port] in
+		let if i==nil then "/" else strsub url i strlen url -> path in
+		[host port path];;
+
+fun tcpevent t val msg sock=
+	if val==TCPWRITE then tcpwrite t sock
+	else if val==TCPCLOSE then tcpread t nil sock
+	else tcpread t msg sock;
+	0;;
+
+
+fun httpsendreq ip x=
+	Secho "found ip>>>>>>>>>>>>>>>>>>>>>>>>>"; Secholn ip;
+	let x->[port httpreq] in
+	if ip==nil then (call httpreq.cbH [httpreq nil]; nil)
+	else
+	(
+		set httpreq.cnxH=opentcp netip nil useparamip ip port fixarg4 #tcpevent httpreq;
+		set httpreq.stateH=HTTP_REACH;
+		nil
+	);
+	0;;
+
+
+//##> cr�ation d'une requ�te http
+// param�tres : verb=verbe de la requ�te url=url de la requ�te postdata=donn�es suppl�mentaires (nil si aucune) cb=callback de retour
+fun httprequest verb url postdata cb type=
+//	Secho "HTTPREQUEST url =";Secholn url;
+	let cuturl url ->[host port path] in	// d�codage de l'url de la requ�te
+	let if confGetProxy then strcatlist "http://"::host::":"::(itoa port)::path::nil else path -> path in //Icy-MetaData:1\13\n
+	let strcatlist verb::" "::path::" HTTP/1.0\13\nUser-Agent: MTL\13\nPragma: no-cache\13\nIcy-MetaData:1\13\nHost: "::host::"\13\n"::
+			if postdata==nil then "\13\n"::nil
+			else "Content-length: "::(itoa strlen postdata)::"\13\n\13\n"::postdata::nil
+		-> request in	// cr�ation de la cha�ne requ�te
+	let if confGetProxy then webip confGetProxyip else host -> host in
+	let if confGetProxy then confGetProxyport else port -> port in
+	let [outputH:request indexH:0 cbH:cb typeH:type stateH:HTTP_SOLVE aliveH:time_ms] -> httpreq in	// cr�ation de la structure requ�te
+	(
+//		Secho "HTTPREQUEST host =";Secholn host;
+		if isip host 0 then httpsendreq host [port httpreq]
+		else
+		(
+			dnsreq host fixarg2 #httpsendreq [port httpreq];
+			nil
+		);
+		httpreq	// on retourne la structure requ�te pour pouvoir �ventuellement l'interrompre en cours de route
+	);;
+
+//##> interruption d'une requ�te en cours
+fun httpabort httpreq=
+	closetcp httpreq.cnxH;;	// on ferme la socket de la requ�te
+
+fun httpenable httpreq v=
+	enabletcp httpreq.cnxH v;;
+
+fun httpstate httpreq = httpreq.stateH;;
+
+fun httpinactive httpreq = time_ms-httpreq.aliveH;;
+
+
+var http_sep="\13\n\13\n";;	// s�parateur entre l'en-t�te et le corps de la r�ponse � une requ�te
+
+	
+
+//##> retourne le header d'une r�ponse � une requ�te
+fun httpgetheader res =
+	let strstr res http_sep 0 -> i in
+	if i==nil then res
+	else strsub res 0 i+strlen http_sep;;
+
+//##> retourne le contenu d'une r�ponse � une requ�te (sans header)
+fun httpgetcontent res =
+	let strstr res http_sep 0 -> i in
+	if i==nil then nil
+	else strsub res i+strlen http_sep strlen res;;
+
+//-------------------
+
+//------------ END ./lib/net/http.mtl ------------
+
+
+//------------ BEGIN ./lib/std/audiolib.mtl ------------
+ifdef AUDIOLIB {
+
+var WAV_IDLE=0;;
+var WAV_RUN=1;;
+var WAV_EOF=2;;
+
+var WAV_BUFFER_STARTSIZE=80000;;
+var WAV_BUFFER_MAXSIZE=400000;;
+
+var WAV_END_TIMEOUT=500;;
+var WAV_NET_TIMEOUT=10000;;
+
+var wav_end_timeout;;
+
+var wav_state=0;;
+var wav_http;;
+var wav_fifo;;
+var wav_buffering;;
+var wav_index;;
+var wav_lasttime;;
+var wav_lastnet;;
+var wav_zeros;;
+
+var lastvol;;
+var forcedvol=0;;
+fun volfrombutton v=let 255-v -> v in 255-((v*v)>>8);;
+
+/*
+fun updatevol=
+	let button3 -> v in
+	if !forcedvol && v!=lastvol && (!recording) && (lastvol!=255 || v<250) then
+	(
+		set lastvol=v;
+		sndVol volfrombutton v
+	);;
+*/
+
+fun forcevol v=
+	sndVol volfrombutton (button3*v)>>8;
+	set forcedvol=1;
+	0;;
+fun unforcevol=
+	set forcedvol=0;
+	set lastvol=nil;
+	0;;
+
+fun wavgetzeros=
+	if wav_zeros==nil then
+	(
+		set wav_zeros=strnew 2048;
+		for i=0;i<2048 do strset wav_zeros i 0
+	);
+	wav_zeros;;
+
+fun wavstop =
+Secholn "###wavstop";
+	if wav_state!=WAV_IDLE then
+	(
+		playStop;
+		if wav_http!=nil then httpabort wav_http;
+		set wav_http=nil;
+		set wav_state=WAV_IDLE
+	);;
+
+fun wavrunning =
+	if wav_state==WAV_IDLE then 0
+	else if wav_fifo==nil && wav_state==WAV_EOF && (time_ms-wav_lasttime>wav_end_timeout) then
+	(
+Secholn "###wav detected end";
+		wavstop;
+		0
+	)
+	else if wav_lasttime==nil then -1 else 1;;
+
+fun _wavcb i =
+//Secho "p";
+	set wav_lasttime=time_ms;
+//	Iecho i;Secho ":cbplay\n";
+	if wav_fifo==nil then
+	(
+		if wav_state==WAV_EOF then playFeed nil nil nil
+		else
+		(
+				if !wav_buffering then Secholn ">>>>buffering...............";
+				set wav_buffering=1
+		)
+	)
+	else
+	(
+		if wav_buffering && (wav_state==WAV_EOF || (slistlen wav_fifo)>=WAV_BUFFER_STARTSIZE)
+			then set wav_buffering=0;
+		if !wav_buffering then let hd wav_fifo -> sample in
+		let strlen sample -> len in
+		(
+			if wav_index<len then 
+				set wav_index=wav_index+playFeed sample /*Iecho*/ wav_index nil;
+			if wav_index>=len then
+			(
+				set wav_index=0;
+				set wav_fifo=tl wav_fifo;
+				if wav_http!=nil then if (slistlen wav_fifo)<WAV_BUFFER_MAXSIZE then httpenable wav_http 1
+			)
+		)
+	);
+	0;;
+
+fun _wavstartnow =
+	set wav_index=0;
+	set wav_buffering=1;
+	playStart 1024 #_wavcb;;
+
+fun wavstartlocalEx l timeout=
+	wavstop;
+	set wav_end_timeout=timeout;
+	set wav_fifo=conc l (wavgetzeros)::nil;
+	set wav_state=WAV_EOF;
+	set wav_lasttime=time_ms;
+	set wav_http=nil;
+	_wavstartnow
+	;;
+
+fun wavstartlocal l=wavstartlocalEx l WAV_END_TIMEOUT;;
+/*
+fun itobin4 i=strcatlist (ctoa i)::(ctoa i>>8)::(ctoa i>>16)::(ctoa i>>24)::nil;;
+fun itobin2 i=strcatlist (ctoa i)::(ctoa i>>8)::nil;;
+
+fun mkwav freq channel bps=
+	let strcatlist 
+		"WAVEfmt "::(itobin4 0x12)::
+			(itobin2 1)::(itobin2 channel)::
+			(itobin4 freq)::(itobin4 freq*channel*bps/8)::
+			(itobin2 channel*bps/8)::(itobin4 bps)::
+		"data"::(itobin4 0)::nil -> c in
+	strcatlist "RIFF"::(itobin4 (strlen c))::c::nil;;
+*/
+
+fun _wavcbhttp httpreq req=
+	set wav_lastnet=time_ms;
+	if req==nil then
+	(
+		Secholn ">>>>>>>>>>>>>>>>>>>>>>>>>>>>><end of file";
+		set wav_state=WAV_EOF;
+		if wav_fifo!=nil then set wav_fifo=conc wav_fifo (wavgetzeros)::nil;
+		if wav_index==nil then
+		(
+			set wav_fifo=tl wav_fifo;
+			if wav_fifo==nil then wavstop
+			else _wavstartnow
+		);
+		0
+	)
+	else
+	(
+//		dump req;
+		set wav_fifo=conc wav_fifo req::nil;
+		let slistlen wav_fifo -> n in
+		if wav_index==nil && n>WAV_BUFFER_STARTSIZE then
+		(
+			set wav_fifo=tl wav_fifo;
+			_wavstartnow
+		)
+		else if n>WAV_BUFFER_MAXSIZE then
+		(
+			Secholn "\n>>>>>>>>>>>>>>http wait";
+			httpenable httpreq 0
+		);
+		nil
+	);
+	//updatevol;
+	0;;
+
+fun wavstarthttp url =
+	wavstop;
+	set wav_end_timeout=WAV_END_TIMEOUT;
+	set wav_fifo=nil;
+	set wav_state=WAV_RUN;
+	set wav_index=nil;
+	set wav_buffering=1;
+	set wav_lasttime=nil;
+	set wav_lastnet=time_ms;
+	set wav_http=httprequest "GET" url nil #_wavcbhttp HTTP_STREAM;;
+
+fun wavtime =
+	if wav_http!=nil && wav_state==WAV_RUN && (time_ms-wav_lastnet>WAV_NET_TIMEOUT) then
+	(
+		if wav_http!=nil then
+		(
+			Secholn "####wavhttp abort";
+			httpabort wav_http;
+			set wav_http=nil;
+			_wavcbhttp wav_http nil;
+			0
+		)
+	);
+//	wavrunning;
+	0;;
+
+}
+//------------ END ./lib/std/audiolib.mtl ------------
+
+
+
 //------------ BEGIN ./utils.mtl ------------
 fun dumpList l0=
   for l=l0;l!=nil;tl l do (Secho hd l; Secho "::");
@@ -1207,34 +1576,34 @@ fun earLoop =
             let (motorget i)%17 -> state in
                 if es.isMoving == 1 then (
                     // if moving
-                    //Secholn "moving";
+                    Secholn "moving";
                     if state == es.targetPos then (
-                        //Secholn "stopped ok";
+                        Secholn "stopped ok";
                         // if reached requested state, stop motor
                         set earState.i = [lastTime: es.lastTime targetPos: es.targetPos isMoving: 0 isBroken: es.isBroken lastPos: state lastPosTime: time_ms reported: 1];
                         motorset i 0
-                    ) else if time_ms >= es.lastTime + 5000 then (
-                        //Secholn "stopped fail";
+                    ) else if time_ms >= es.lastTime + 8000 then (
+                        Secholn "stopped fail";
                         // if moving for more than 5s (and target state not reached), mark ear as broken
-                        set earState.i = [lastTime: time_ms targetPos: 0 isMoving: 0 isBroken: 1 lastPos: 0 lastPosTime: 0 reported: 1];
+                        //set earState.i = [lastTime: time_ms targetPos: 0 isMoving: 0 isBroken: 1 lastPos: 0 lastPosTime: 0 reported: 1];
+                        set earState.i = [lastTime: es.lastTime targetPos: es.targetPos isMoving: 0 isBroken: es.isBroken lastPos: state lastPosTime: time_ms reported: 1];
                         motorset i 0
                     )
                 )
                 else (
                     if state != es.lastPos then (
                         // if state changed, update lastPos/lastPosTime
-                        //Secholn "state changed";
-                        //Iecholn state;
-                        //Iecholn es.lastPos;
+                        Secholn "state changed";
+                        Iecholn state;
                         //earStateDump es;
                         set earState.i = [lastTime: es.lastTime targetPos: es.targetPos isMoving: es.isMoving isBroken: es.isBroken lastPos: state lastPosTime: time_ms reported: 0]
                         ;0
                     )
                     else (
                         if es.reported == 0 && es.lastPosTime + 500 < time_ms then (
-                            //Secholn "reporting change";
+                            Secholn "reporting change";
                             // if last state have changed but is stable for 500ms, send update to server
-                            writetcpconn strcatlist "12;"::(itoa i)::";"::(itoa es.lastPos)::nil;
+                            writetcpconn strcatlist "11;"::(itoa i)::";"::(itoa es.lastPos)::nil;
                             set earState.i = [lastTime: es.lastTime targetPos: es.targetPos isMoving: es.isMoving isBroken: es.isBroken lastPos: es.lastPos lastPosTime: es.lastPosTime reported: 1]
                         );
                         
@@ -1246,7 +1615,7 @@ fun earLoop =
                                     // start moving to e.positions.j with e.directions.j 
                                     set earState.i =  [lastTime: time_ms targetPos: e.positions.j isMoving: 1 isBroken: es.isBroken lastPos: es.lastPos lastPosTime: es.lastPosTime reported: es.reported];
                                     motorset i if e.directions.j == 1 then 1 else -1;
-                                    //Secholn "started";
+                                    Secholn "started";
 
                                     // update next step
                                     if e.intervals.j == 0 then 
@@ -1307,7 +1676,6 @@ fun buttonLoop =
         )
     )
     ;;
-    
 
 fun rfidLoop =
     if lastRfid + 100 < time_ms then (
@@ -1320,26 +1688,55 @@ fun rfidLoop =
 //------------ END ./events.mtl ------------
 
 
-//------------ BEGIN ./handlers.mtl ------------
+//------------ BEGIN ./recorder.mtl ------------
 
-// --------------------------- net handlers ---------------------------
+var isRecording;;
+var recBuf;;
+
+fun cbrec s = 
+    Secholn "rec cb";
+    //adp2wav recBuf 0 s 0 256;
+    writetcpconn strcatlist "08;"::(strtohex s)::nil;;
 
 fun recorderHandler data = 
-    Secholn data;;
+    let rev split data ";" nil nil -> x in
+    let atoi hd x -> tp in
+        if tp == 0 && isRecording > 0 then (
+            // stop
+            Secholn "recording stopped";
+            recStop
+        ) else if tp == 1 && isRecording <= 0 then (
+            // start
+            Secholn "recording ...";
+            recStart 8000 0 #cbrec
+        );;
+
+//------------ END ./recorder.mtl ------------
+
+
+//------------ BEGIN ./player.mtl ------------
 
 fun playerHandler data = 
-    Secholn data;;
-
-fun recordDataHandler data = 
-    Secholn data;;
-
-fun playDataHandler data = 
-    Secholn data;;
+    let rev split data ";" nil nil -> x in
+    let atoi hd x -> tp in
+        if tp == 0 && isRecording > 0 then (
+            // stop
+            Secholn "player stopped";
+            wavstop
+        ) else if tp == 1 && isRecording <= 0 then (
+            // start
+            Secholn "player started";
+            wavstarthttp hd tl x;
+            0
+        ) else if tp == 2 then (
+            sndVol atoi hd tl x
+        )
+        ;;
 
 fun midiHandler data = 
     Secholn data;;
 
-//------------ END ./handlers.mtl ------------
+//------------ END ./player.mtl ------------
 
 
 //------------ BEGIN ./server.mtl ------------
@@ -1353,7 +1750,12 @@ fun tcpread cnx input=
     let hd l -> msg in
     let time_ms -> t in
     let strsub msg 0 2 -> pktType in
-        if !strcmp pktType "01" then
+        if !strcmp pktType "00" then 
+        (
+          writetcp cnx "00;pong" 0;
+          0
+        )
+        else if !strcmp pktType "01" then
         (
           reboot 0x0407FE58 0x13fb6754;
           0
@@ -1378,17 +1780,7 @@ fun tcpread cnx input=
           playerHandler strsub msg 3 nil;
           0
         )
-        else if !strcmp pktType "08" then
-        (
-          recordDataHandler strsub msg 3 nil;
-          0
-        )
         else if !strcmp pktType "09" then
-        (
-          playDataHandler strsub msg 3 nil;
-          0
-        )
-        else if !strcmp pktType "11" then
         (
           midiHandler strsub msg 3 nil;
           0
@@ -1445,7 +1837,7 @@ fun mainSetup =
     Secholn "test";;
 
 fun mainLoop = 
-    //ledLoop;
+    ledLoop;
     earLoop;
     buttonLoop;
     rfidLoop;

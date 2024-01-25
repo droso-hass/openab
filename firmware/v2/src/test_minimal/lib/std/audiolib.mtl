@@ -25,6 +25,7 @@ var lastvol;;
 var forcedvol=0;;
 fun volfrombutton v=let 255-v -> v in 255-((v*v)>>8);;
 
+/*
 fun updatevol=
 	let button3 -> v in
 	if !forcedvol && v!=lastvol && (!recording) && (lastvol!=255 || v<250) then
@@ -32,6 +33,7 @@ fun updatevol=
 		set lastvol=v;
 		sndVol volfrombutton v
 	);;
+*/
 
 fun forcevol v=
 	sndVol volfrombutton (button3*v)>>8;
@@ -164,7 +166,7 @@ fun _wavcbhttp httpreq req=
 		);
 		nil
 	);
-	updatevol;
+	//updatevol;
 	0;;
 
 fun wavstarthttp url =

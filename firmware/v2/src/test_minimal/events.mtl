@@ -41,7 +41,6 @@ fun buttonLoop =
         )
     )
     ;;
-    
 
 fun rfidLoop =
     if lastRfid + 100 < time_ms then (

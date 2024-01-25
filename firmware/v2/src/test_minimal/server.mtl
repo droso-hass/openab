@@ -8,7 +8,12 @@ fun tcpread cnx input=
     let hd l -> msg in
     let time_ms -> t in
     let strsub msg 0 2 -> pktType in
-        if !strcmp pktType "01" then
+        if !strcmp pktType "00" then 
+        (
+          writetcp cnx "00;pong" 0;
+          0
+        )
+        else if !strcmp pktType "01" then
         (
           reboot 0x0407FE58 0x13fb6754;
           0
@@ -33,17 +38,7 @@ fun tcpread cnx input=
           playerHandler strsub msg 3 nil;
           0
         )
-        else if !strcmp pktType "08" then
-        (
-          recordDataHandler strsub msg 3 nil;
-          0
-        )
         else if !strcmp pktType "09" then
-        (
-          playDataHandler strsub msg 3 nil;
-          0
-        )
-        else if !strcmp pktType "11" then
         (
           midiHandler strsub msg 3 nil;
           0

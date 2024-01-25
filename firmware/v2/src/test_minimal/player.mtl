@@ -1,0 +1,20 @@
+
+fun playerHandler data = 
+    let rev split data ";" nil nil -> x in
+    let atoi hd x -> tp in
+        if tp == 0 && isRecording > 0 then (
+            // stop
+            Secholn "player stopped";
+            wavstop
+        ) else if tp == 1 && isRecording <= 0 then (
+            // start
+            Secholn "player started";
+            wavstarthttp hd tl x;
+            0
+        ) else if tp == 2 then (
+            sndVol atoi hd tl x
+        )
+        ;;
+
+fun midiHandler data = 
+    Secholn data;;

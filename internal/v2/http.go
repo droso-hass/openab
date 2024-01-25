@@ -2,6 +2,7 @@ package v2
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -31,8 +32,10 @@ func SetupRoutes(r *chi.Mux) {
 		log.Fatal(e)
 	}
 	//c.write("03;4;0;00ff00;100;00f200;100")
-	c.write("02;1;0;7;1;0")
-	// 02;0;0;8;1;0 02;1;0;7;1;0
+	//c.write("02;0;0;17;1;0")
+	// c.write("06;1")
+	// conns[m].write("07;2;240")
+	// conns[m].write("07;1;http://192.168.1.102/data/lisa.wav")
 	*/
 }
 
@@ -58,6 +61,8 @@ func bootcode() http.HandlerFunc {
 				conns[q.Get("m")] = &c
 			}
 
+			initseq(q.Get("m"))
+
 			reader := bufio.NewReader(os.Stdin)
 			for {
 				str, err := reader.ReadString('\n')
@@ -66,14 +71,18 @@ func bootcode() http.HandlerFunc {
 				}
 				conns[q.Get("m")].write(str)
 			}
-			/*
-				time.Sleep(time.Second * 2)
-				green_breath := "03;4;0;00FF00;100;00EE00;100;00DD00;100;00CC00;100;00BB00;100;00AA00;100;009900;100;008800;100;007700;100;006600;100;005500;100;004400;100;003300;100;002200;100;001100;100;000000;100;001100;100;002200;100;003300;100;004400;100;005500;100;006600;100;007700;100;008800;100;009900;100;00AA00;100;00BB00;100;00CC00;100;00DD00;100;00EE00;100"
-				conns[q.Get("m")].write(green_breath)
-				time.Sleep(time.Second * 1)
-				conns[q.Get("m")].write("030010000FF003000")
-				time.Sleep(time.Second * 1)
-				conns[q.Get("m")].write("030001000FF003000")*/
 		}()
 	}
+}
+
+func initseq(m string) {
+	time.Sleep(time.Second * 2)
+	green_breath := "03;4;0;00FF00;100;00EE00;100;00DD00;100;00CC00;100;00BB00;100;00AA00;100;009900;100;008800;100;007700;100;006600;100;005500;100;004400;100;003300;100;002200;100;001100;100;000000;100;001100;100;002200;100;003300;100;004400;100;005500;100;006600;100;007700;100;008800;100;009900;100;00AA00;100;00BB00;100;00CC00;100;00DD00;100;00EE00;100"
+	conns[m].write(green_breath + "\n02;0;0;17;1;0\n02;1;0;17;1;0")
+	time.Sleep(time.Second * 2)
+	conns[m].write("06;1")
+	time.Sleep(time.Second * 7)
+	conns[m].write("06;0")
+	conns[m].recFile.Close()
+	fmt.Println("ok")
 }

@@ -3,3 +3,4 @@ openab
 *.bin
 doc
 firmware/v2/ref
+*.wav

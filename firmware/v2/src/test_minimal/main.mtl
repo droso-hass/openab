@@ -23,11 +23,15 @@ var SIMU;;
 #include lib/net/dns.mtl
 #endif
 
+#include lib/net/http.mtl
+#include lib/std/audiolib.mtl
+
 #include utils.mtl
 #include led.mtl
 #include ear.mtl
 #include events.mtl
-#include handlers.mtl
+#include recorder.mtl
+#include player.mtl
 #include server.mtl
 
 fun mainSetup = 
@@ -37,7 +41,7 @@ fun mainSetup =
     Secholn "test";;
 
 fun mainLoop = 
-    //ledLoop;
+    ledLoop;
     earLoop;
     buttonLoop;
     rfidLoop;
