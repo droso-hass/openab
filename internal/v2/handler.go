@@ -3,27 +3,28 @@ package v2
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
+	"strings"
+	"time"
 )
+
+var RecDataSize = 4096
 
 func (n *NabConn) processNabMessage(data []byte) {
 	sdata := string(data)
-	if sdata[0:2] == "008" {
-		if n.recFile == nil {
-			f, err := os.OpenFile("./rec.wav", os.O_WRONLY|os.O_CREATE, 0777)
+	if sdata[0:2] == "08" {
+		if len(n.recData) >= RecDataSize {
+			filename := fmt.Sprintf("./rec/%s_%d.wav", strings.Replace(n.mac, ":", "", -1), time.Now().Unix())
+			err := makeWav(n.recData, filename)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
 			}
-			n.recFile = f
+			n.recData = []byte{}
 		}
 		h, err := hex.DecodeString(sdata[3:])
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, err = n.recFile.Write(h)
-		if err != nil {
-			log.Fatal(err)
+		if err == nil {
+			n.recData = append(n.recData, h...)
+		} else {
+			fmt.Println(err)
 		}
 	}
 	fmt.Println(sdata)

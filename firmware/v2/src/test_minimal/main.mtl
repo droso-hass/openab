@@ -25,6 +25,7 @@ var SIMU;;
 
 #include lib/net/http.mtl
 #include lib/std/audiolib.mtl
+//#include lib/std/reclib.mtl
 
 #include utils.mtl
 #include led.mtl
@@ -41,7 +42,7 @@ fun mainSetup =
     Secholn "test";;
 
 fun mainLoop = 
-    ledLoop;
+    //ledLoop;
     earLoop;
     buttonLoop;
     rfidLoop;

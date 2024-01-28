@@ -2,20 +2,22 @@ package v2
 
 import (
 	"net"
-	"os"
 )
 
 type NabConn struct {
 	addr    string
+	mac     string
 	conn    net.Conn
 	stop    bool
-	recFile *os.File
+	recData []byte
 }
 
-func New(addr string) *NabConn {
+func New(addr string, mac string) *NabConn {
 	return &NabConn{
-		addr: addr,
-		stop: false,
+		addr:    addr,
+		mac:     mac,
+		stop:    false,
+		recData: []byte{},
 	}
 }
 
@@ -37,9 +39,9 @@ func (n *NabConn) Connect() error {
 		for !n.stop {
 			//fmt.Println("reading ...")
 			buf := make([]byte, 2048)
-			_, err := conn.Read(buf)
+			nb, err := conn.Read(buf)
 			if err == nil {
-				n.processNabMessage(buf)
+				n.processNabMessage(buf[0:nb])
 			}
 		}
 	}()

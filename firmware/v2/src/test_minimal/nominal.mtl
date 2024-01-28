@@ -1414,6 +1414,7 @@ fun wavtime =
 
 }
 //------------ END ./lib/std/audiolib.mtl ------------
+//#include lib/std/reclib.mtl
 
 
 
@@ -1692,11 +1693,18 @@ fun rfidLoop =
 
 var isRecording;;
 var recBuf;;
+var recTime;;
 
 fun cbrec s = 
-    Secholn "rec cb";
-    //adp2wav recBuf 0 s 0 256;
-    writetcpconn strcatlist "08;"::(strtohex s)::nil;;
+    writetcpconn strcatlist "08;"::(strtohex s)::nil;
+    /*set recBuf = s::recBuf;
+    if recTime + 1000 < time_ms then (
+        set recTime = time_ms;
+        let Iecholn liststrlen recBuf 0 -> len in
+        writetcpconn strcatlist "08;"::(strtohex strcatlist (mkriff recBuf))::"quoicoubeh"::nil;
+        set recBuf = nil
+    );*/
+    0;;
 
 fun recorderHandler data = 
     let rev split data ";" nil nil -> x in
@@ -1708,6 +1716,7 @@ fun recorderHandler data =
         ) else if tp == 1 && isRecording <= 0 then (
             // start
             Secholn "recording ...";
+            set recTime = time_ms;
             recStart 8000 0 #cbrec
         );;
 

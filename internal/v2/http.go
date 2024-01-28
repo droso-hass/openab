@@ -2,7 +2,6 @@ package v2
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -35,7 +34,7 @@ func SetupRoutes(r *chi.Mux) {
 	//c.write("02;0;0;17;1;0")
 	// c.write("06;1")
 	// conns[m].write("07;2;240")
-	// conns[m].write("07;1;http://192.168.1.102/data/lisa.wav")
+	// conns[m].write("07;1;http://192.168.1.102/data/lisa.mp3")
 	*/
 }
 
@@ -49,19 +48,20 @@ func bootcode() http.HandlerFunc {
 			addr := utils.GetIPFromRequest(r) + ":5000"
 			time.Sleep(time.Second * 3)
 			slog.Info("connecting to " + addr)
+			mac := q.Get("m")
 
 			// if a connection is already open, close it
-			c, ok := conns[q.Get("m")]
+			c, ok := conns[mac]
 			if ok {
 				c.Disconnect()
 				c.Connect()
 			} else {
-				c := *New(addr)
+				c := *New(addr, mac)
 				c.Connect()
-				conns[q.Get("m")] = &c
+				conns[mac] = &c
 			}
 
-			initseq(q.Get("m"))
+			initseq(mac)
 
 			reader := bufio.NewReader(os.Stdin)
 			for {
@@ -69,7 +69,7 @@ func bootcode() http.HandlerFunc {
 				if err != nil {
 					log.Fatal(err)
 				}
-				conns[q.Get("m")].write(str)
+				conns[mac].write(str)
 			}
 		}()
 	}
@@ -78,11 +78,11 @@ func bootcode() http.HandlerFunc {
 func initseq(m string) {
 	time.Sleep(time.Second * 2)
 	green_breath := "03;4;0;00FF00;100;00EE00;100;00DD00;100;00CC00;100;00BB00;100;00AA00;100;009900;100;008800;100;007700;100;006600;100;005500;100;004400;100;003300;100;002200;100;001100;100;000000;100;001100;100;002200;100;003300;100;004400;100;005500;100;006600;100;007700;100;008800;100;009900;100;00AA00;100;00BB00;100;00CC00;100;00DD00;100;00EE00;100"
-	conns[m].write(green_breath + "\n02;0;0;17;1;0\n02;1;0;17;1;0")
-	time.Sleep(time.Second * 2)
+	conns[m].write(green_breath + "\n02;0;0;0;1;0\n02;1;0;0;1;0")
+	/*time.Sleep(time.Second * 2)
 	conns[m].write("06;1")
 	time.Sleep(time.Second * 7)
 	conns[m].write("06;0")
 	conns[m].recFile.Close()
-	fmt.Println("ok")
+	fmt.Println("ok")*/
 }
