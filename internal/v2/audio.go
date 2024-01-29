@@ -1,10 +1,12 @@
 package v2
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"log"
 	"os"
+	"os/exec"
 )
 
 var ConstRiff []byte
@@ -28,7 +30,7 @@ func init() {
 	}
 }
 
-func makeWav(data []byte, outfile string) error {
+func makeWav(data []byte) ([]byte, error) {
 	l := len(data)
 	riffSize := make([]byte, 4)
 	binary.LittleEndian.PutUint32(riffSize, uint32(l+52))
@@ -45,27 +47,44 @@ func makeWav(data []byte, outfile string) error {
 	header = append(header, ConstData...)
 	header = append(header, size...)
 
-	out, err := os.OpenFile(outfile, os.O_WRONLY|os.O_CREATE, 0777)
-	if err != nil {
-		return err
-	}
-	_, err = out.Write(header)
-	if err != nil {
-		return err
-	}
-	_, err = out.Write(data)
-	if err != nil {
-		return err
-	}
-	err = out.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return append(header, data...), nil
 }
 
-func convertRecording() {
-	// ffmpeg -i in.wav -acodec pcm_s16le out.wav
+// ffmpeg -i in.wav -acodec pcm_s16le out.wav
+func convertRecording(in []byte) ([]byte, error) {
+	cmd := exec.Command("ffmpeg",
+		"-hide_banner", "-loglevel", "panic",
+		"-i", "pipe:0",
+		"-acodec", "pcm_s16le",
+		"-f", "wav",
+		"pipe:1",
+	)
+	out := new(bytes.Buffer)
+
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = out
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	_, err = stdin.Write(in)
+	if err != nil {
+		return nil, err
+	}
+	err = stdin.Close()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
 }
 
 func convertPlayer() {

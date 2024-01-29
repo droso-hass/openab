@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/droso-hass/openab/internal/utils"
 )
 
 var RecDataSize = 4096
@@ -12,20 +14,35 @@ var RecDataSize = 4096
 func (n *NabConn) processNabMessage(data []byte) {
 	sdata := string(data)
 	if sdata[0:2] == "08" {
-		if len(n.recData) >= RecDataSize {
-			filename := fmt.Sprintf("./rec/%s_%d.wav", strings.Replace(n.mac, ":", "", -1), time.Now().Unix())
-			err := makeWav(n.recData, filename)
-			if err != nil {
-				fmt.Println(err)
-			}
-			n.recData = []byte{}
-		}
-		h, err := hex.DecodeString(sdata[3:])
-		if err == nil {
-			n.recData = append(n.recData, h...)
-		} else {
+		err := n.handleRecording(sdata[3:])
+		if err != nil {
 			fmt.Println(err)
 		}
 	}
 	fmt.Println(sdata)
+}
+
+func (n *NabConn) handleRecording(rawdata string) error {
+	if len(n.recData) >= RecDataSize {
+		wav, err := makeWav(n.recData)
+		if err != nil {
+			return err
+		}
+		filedata, err := convertRecording(wav)
+		if err != nil {
+			return err
+		}
+		filename := fmt.Sprintf("./rec/%s_%d.wav", strings.Replace(n.mac, ":", "", -1), time.Now().Unix())
+		err = utils.WriteFile(filename, filedata)
+		if err != nil {
+			return err
+		}
+		n.recData = []byte{}
+	}
+	h, err := hex.DecodeString(rawdata)
+	if err != nil {
+		return err
+	}
+	n.recData = append(n.recData, h...)
+	return nil
 }

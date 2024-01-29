@@ -1695,15 +1695,17 @@ var isRecording;;
 var recBuf;;
 var recTime;;
 
+fun writerecdata data = 
+    let strlen data -> len in
+    if len > 512 then (
+        writetcpconn strcatlist "08;"::(strsub data 0 512)::nil;
+        writerecdata strsub data 512 nil
+    ) else (
+        writetcpconn strcatlist "08;"::data::nil
+    );;
+
 fun cbrec s = 
-    writetcpconn strcatlist "08;"::(strtohex s)::nil;
-    /*set recBuf = s::recBuf;
-    if recTime + 1000 < time_ms then (
-        set recTime = time_ms;
-        let Iecholn liststrlen recBuf 0 -> len in
-        writetcpconn strcatlist "08;"::(strtohex strcatlist (mkriff recBuf))::"quoicoubeh"::nil;
-        set recBuf = nil
-    );*/
+    writerecdata strtohex s;
     0;;
 
 fun recorderHandler data = 
@@ -1730,14 +1732,17 @@ fun playerHandler data =
     let atoi hd x -> tp in
         if tp == 0 && isRecording > 0 then (
             // stop
+            led 0 0xFF0000;
             Secholn "player stopped";
             wavstop
         ) else if tp == 1 && isRecording <= 0 then (
             // start
+            led 0 0x00FF00;
             Secholn "player started";
             wavstarthttp hd tl x;
             0
         ) else if tp == 2 then (
+            led 0 0x0000FF;
             sndVol atoi hd tl x
         )
         ;;
@@ -1846,7 +1851,7 @@ fun mainSetup =
     Secholn "test";;
 
 fun mainLoop = 
-    ledLoop;
+    //ledLoop;
     earLoop;
     buttonLoop;
     rfidLoop;
