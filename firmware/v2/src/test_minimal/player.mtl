@@ -4,14 +4,17 @@ fun playerHandler data =
     let atoi hd x -> tp in
         if tp == 0 && isRecording > 0 then (
             // stop
+            led 0 0xFF0000;
             Secholn "player stopped";
             wavstop
         ) else if tp == 1 && isRecording <= 0 then (
             // start
+            led 0 0x00FF00;
             Secholn "player started";
             wavstarthttp hd tl x;
             0
         ) else if tp == 2 then (
+            led 0 0x0000FF;
             sndVol atoi hd tl x
         )
         ;;

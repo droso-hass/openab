@@ -1433,13 +1433,27 @@ fun split data separator lst =
 
 var conn;;
 
-fun writetcpconn data = 
+fun _writetcpconn data n = 
   /*for l=conn;l!=nil;tl l do (
     led 0 0x00FF00;
     writetcp hd l data 0
   )*/
-  writetcp conn data 0
+  if n > 10 then
+    nil
+  else (
+    let writetcp conn data 0 -> ret in
+    if ret == nil then
+      _writetcpconn data n+1
+  )
   ;;
+
+fun writetcpconn data =
+  if _writetcpconn data 0 == nil then
+    led 0 0xFF0000
+  else
+    led 0 0x00FF00
+  ;;
+
 
 fun _strtohex key i=
   if i < strlen key then (ctoh strget key i)::_strtohex key i+1;;
@@ -1694,15 +1708,32 @@ fun rfidLoop =
 var isRecording;;
 var recBuf;;
 var recTime;;
+var cpt;;
+
 
 fun writerecdata data = 
     let strlen data -> len in
     if len > 512 then (
-        writetcpconn strcatlist "08;"::(strsub data 0 512)::nil;
-        writerecdata strsub data 512 nil
+        set cpt = cpt + 1;
+        writetcpconn strcatlist "08;"::(itoa cpt)::";"::(strsub data 0 512)::nil
+        //writetcpconn strcatlist "08;"::(strsub data 0 512)::nil;
+        //writerecdata strsub data 512 nil
     ) else (
-        writetcpconn strcatlist "08;"::data::nil
+        set cpt = cpt + 1;
+        writetcpconn strcatlist "08;"::(itoa cpt)::";"::data::nil
+        //writetcpconn strcatlist "08;"::data::nil
     );;
+
+/*
+fun writerecdata data = 
+    let strlen data -> len in
+    let writetcpconn strcatlist "08;"::data::nil -> writtenLen in
+    if writtenLen == nil then 
+        nil
+    else if writtenLen-3 < len then
+        writerecdata strsub data (len-writtenLen+3) nil
+    else writtenLen;;
+*/
 
 fun cbrec s = 
     writerecdata strtohex s;
@@ -1719,6 +1750,7 @@ fun recorderHandler data =
             // start
             Secholn "recording ...";
             set recTime = time_ms;
+            set cpt = 0;
             recStart 8000 0 #cbrec
         );;
 

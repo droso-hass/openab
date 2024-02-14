@@ -2,6 +2,7 @@ package v2
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -69,7 +70,10 @@ func bootcode() http.HandlerFunc {
 				if err != nil {
 					log.Fatal(err)
 				}
-				conns[mac].write(str)
+				err = conns[mac].write(str)
+				if err != nil {
+					fmt.Println(err)
+				}
 			}
 		}()
 	}
