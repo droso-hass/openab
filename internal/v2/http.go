@@ -26,17 +26,21 @@ var conns = map[string]*NabConn{}
 
 func SetupRoutes(r *chi.Mux) {
 	r.Mount("/vl/bc.jsp", bootcode())
-	/*c := New("127.0.0.1:5000")
+	/*c := New("127.0.0.1:5000", "")
 	e := c.Connect()
 	if e != nil {
 		log.Fatal(e)
 	}
 	//c.write("03;4;0;00ff00;100;00f200;100")
-	//c.write("02;0;0;17;1;0")
+	//e = c.write("02;0;0;17;1;0")
 	// c.write("06;1")
 	// conns[m].write("07;2;240")
 	// conns[m].write("07;1;http://192.168.1.102/data/lisa.mp3")
-	*/
+	e = c.write("00;ping")
+	if e != nil {
+		log.Fatal(e)
+	}
+	fmt.Println("ok")*/
 }
 
 func bootcode() http.HandlerFunc {

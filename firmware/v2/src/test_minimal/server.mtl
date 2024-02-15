@@ -10,7 +10,8 @@ fun tcpread cnx input=
     let strsub msg 0 2 -> pktType in
         if !strcmp pktType "00" then 
         (
-          writetcp cnx "00;pong" 0;
+          //writetcp cnx "00;pong" 0;
+          writetcpconn "00;pong;";
           0
         )
         else if !strcmp pktType "01" then

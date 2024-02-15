@@ -41,7 +41,7 @@ func (n *NabConn) Connect() error {
 			buf := make([]byte, 2048)
 			nb, err := conn.Read(buf)
 			if err == nil {
-				go n.processNabMessage(buf[0:nb])
+				n.processNabMessage(buf[0:nb])
 			}
 		}
 	}()

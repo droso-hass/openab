@@ -7,6 +7,7 @@ var cpt;;
 
 fun writerecdata data = 
     let strlen data -> len in
+    /*
     if len > 512 then (
         set cpt = cpt + 1;
         writetcpconn strcatlist "08;"::(itoa cpt)::";"::(strsub data 0 512)::nil
@@ -16,6 +17,10 @@ fun writerecdata data =
         set cpt = cpt + 1;
         writetcpconn strcatlist "08;"::(itoa cpt)::";"::data::nil
         //writetcpconn strcatlist "08;"::data::nil
+    );;*/
+    (
+        set cpt = cpt + 1;
+        writetcpconn strcatlist "08;"::(itoa cpt)::";"::data::nil
     );;
 
 /*

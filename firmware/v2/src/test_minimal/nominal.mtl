@@ -1433,27 +1433,33 @@ fun split data separator lst =
 
 var conn;;
 
-fun _writetcpconn data n = 
-  /*for l=conn;l!=nil;tl l do (
-    led 0 0x00FF00;
-    writetcp hd l data 0
-  )*/
-  if n > 10 then
+fun _writetcpconn data index retries = 
+  if index >= strlen data then (
+    Secholn "end ok";
+    index
+  )
+  else if retries > 100 then (
+    Secholn "end fail";
     nil
+  )
   else (
-    let writetcp conn data 0 -> ret in
-    if ret == nil then
-      _writetcpconn data n+1
+    let writetcp conn data index -> ret in (
+      Iecholn ret;
+      if ret == nil || ret == 0 then
+        _writetcpconn data index retries+1
+      else
+        _writetcpconn data ret 0
+    )
   )
   ;;
 
 fun writetcpconn data =
-  if _writetcpconn data 0 == nil then
+  let _writetcpconn data 0 0 -> x in (
+  if x == nil then
     led 0 0xFF0000
   else
     led 0 0x00FF00
-  ;;
-
+  );;
 
 fun _strtohex key i=
   if i < strlen key then (ctoh strget key i)::_strtohex key i+1;;
@@ -1713,6 +1719,7 @@ var cpt;;
 
 fun writerecdata data = 
     let strlen data -> len in
+    /*
     if len > 512 then (
         set cpt = cpt + 1;
         writetcpconn strcatlist "08;"::(itoa cpt)::";"::(strsub data 0 512)::nil
@@ -1722,6 +1729,10 @@ fun writerecdata data =
         set cpt = cpt + 1;
         writetcpconn strcatlist "08;"::(itoa cpt)::";"::data::nil
         //writetcpconn strcatlist "08;"::data::nil
+    );;*/
+    (
+        set cpt = cpt + 1;
+        writetcpconn strcatlist "08;"::(itoa cpt)::";"::data::nil
     );;
 
 /*
@@ -1798,7 +1809,8 @@ fun tcpread cnx input=
     let strsub msg 0 2 -> pktType in
         if !strcmp pktType "00" then 
         (
-          writetcp cnx "00;pong" 0;
+          //writetcp cnx "00;pong" 0;
+          writetcpconn "00;pong;";
           0
         )
         else if !strcmp pktType "01" then
