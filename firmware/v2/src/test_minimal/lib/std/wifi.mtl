@@ -56,7 +56,7 @@ fun wifiInit rescan=
 	let envget -> env in
 	if env==nil then
 	(
-		setleds 0xff00ff;
+		//setleds 0xff00ff;
 		set wifi=initW;
 		if rescan then set wifiscans=nil;
 		if master then
@@ -82,7 +82,7 @@ fun wifiInit rescan=
 	)
 	else
 	(
-		setleds 0x00ff00;
+		//setleds 0x00ff00;
 		set mymac=netMac;
 		set wifi=stationW;
 		envrestore env;
@@ -115,7 +115,7 @@ fun wificrypttype crypt key=
 	else IEEE80211_CRYPT_NONE;;
 
 fun wifiAuth=
-	setleds 0xff8000;
+	//setleds 0xff8000;
 	if wifiscans==nil then 0
 	else
 		let Iecholn confGetWificrypt -> crypt in
@@ -138,7 +138,7 @@ fun wifiRun=
 		|(initW -> if state==RT2501_S_IDLE then
 				(
 					set mymac=MACecho netMac 0 1;
-					setleds 0xff8000;
+					//setleds 0xff8000;
 					if master then
 					(
 						dumpscan set wifiscans=sort netScan nil #scancmpssid;
@@ -167,7 +167,7 @@ fun wifiRun=
 			)
 		|(gomasterW -> if state==RT2501_S_MASTER then
 				(
-					setleds 0x0000ff;
+					//setleds 0x0000ff;
 					Secholn "-------------master";
 					startdhcpserver;
 //					startconfigserver 80;

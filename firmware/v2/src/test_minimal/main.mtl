@@ -23,6 +23,7 @@ var SIMU;;
 #include lib/net/dns.mtl
 #endif
 
+#include lib/std/wifi.mtl
 #include lib/net/http.mtl
 #include lib/std/audiolib.mtl
 //#include lib/std/reclib.mtl
@@ -52,6 +53,7 @@ fun mainLoop =
 fun main=
     Secholn "starting";
     confInit;
+    wifiInit 0;
     netstart;
     startdnsclient;
     mainSetup;

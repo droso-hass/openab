@@ -4,35 +4,15 @@ var recBuf;;
 var recTime;;
 var cpt;;
 
-
 fun writerecdata data = 
     let strlen data -> len in
-    /*
-    if len > 512 then (
-        set cpt = cpt + 1;
-        writetcpconn strcatlist "08;"::(itoa cpt)::";"::(strsub data 0 512)::nil
-        //writetcpconn strcatlist "08;"::(strsub data 0 512)::nil;
-        //writerecdata strsub data 512 nil
-    ) else (
-        set cpt = cpt + 1;
-        writetcpconn strcatlist "08;"::(itoa cpt)::";"::data::nil
-        //writetcpconn strcatlist "08;"::data::nil
-    );;*/
     (
         set cpt = cpt + 1;
-        writetcpconn strcatlist "08;"::(itoa cpt)::";"::data::nil
+        // conn.dstT is the address of the client connected to our tcp server
+        // netip is the address of the rabbit
+        udpsend netip 4001 conn.dstT 4000 strcatlist "08;"::(itoa cpt)::";"::data::nil nil
     );;
 
-/*
-fun writerecdata data = 
-    let strlen data -> len in
-    let writetcpconn strcatlist "08;"::data::nil -> writtenLen in
-    if writtenLen == nil then 
-        nil
-    else if writtenLen-3 < len then
-        writerecdata strsub data (len-writtenLen+3) nil
-    else writtenLen;;
-*/
 
 fun cbrec s = 
     writerecdata strtohex s;

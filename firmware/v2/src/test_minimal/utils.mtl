@@ -32,13 +32,7 @@ fun _writetcpconn data index retries =
   )
   ;;
 
-fun writetcpconn data =
-  let _writetcpconn data 0 0 -> x in (
-  if x == nil then
-    led 0 0xFF0000
-  else
-    led 0 0x00FF00
-  );;
+fun writetcpconn data = _writetcpconn data 0 0;;
 
 fun _strtohex key i=
   if i < strlen key then (ctoh strget key i)::_strtohex key i+1;;

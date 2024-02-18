@@ -10,7 +10,6 @@ fun tcpread cnx input=
     let strsub msg 0 2 -> pktType in
         if !strcmp pktType "00" then 
         (
-          //writetcp cnx "00;pong" 0;
           writetcpconn "00;pong;";
           0
         )
@@ -51,11 +50,8 @@ fun tcpread cnx input=
           0
         )
   );
-
-    //let strcatlist "pong "::idx::nil -> data in 
-    //writetcp cnx data 0;
-    nil
-    ;;
+  nil
+  ;;
 
 fun tcpevent cnx val msg=
     if val==TCPSTART || val==TCPREAD then (
@@ -79,10 +75,5 @@ fun cbsrv cnx code msg=
 
 fun startsocketserver port=
     listentcp port #cbsrv;
-    // led LED_NOSE RGB_BLUE;
     Secholn "start socket server";
-    //let "a;b;cde;fg;hh\nquoi;coubeh\nbo;zuf;gluf" -> msg in
-    //  for l=split msg "\n" nil; l!=nil; tl l do (
-    //    dumpList rev split hd l ";" nil nil
-    //  );
     0;;
