@@ -1,12 +1,15 @@
 
-all: v2-firmware server
+all: v2-firmware copy server
 
-server: internal/* main.go go.mod go.sum
-	go build
+server: server/internal/* server/main.go server/go.mod server/go.sum
+	cd server && go build
 
-v2-metalc: firmware/v2/mtl_linux/*
-	cd firmware/v2/mtl_linux && make comp
+v2-metalc: tagtag_fw/mtl_linux/*
+	cd tagtag_fw/mtl_linux && make comp
 
-v2-firmware: v2-metalc firmware/v2/src/test_minimal*
-	cd firmware/v2/src/test_minimal && ./include.py ./main.mtl ./nominal.mtl
-	cd firmware/v2/mtl_linux && ./mtl_compiler -s ../src/test_minimal/nominal.mtl ../nominal.bin
+v2-firmware: v2-metalc tagtag_fw/src*
+	cd tagtag_fw/src && ./include.py ./main.mtl ./nominal.mtl
+	cd tagtag_fw/mtl_linux && ./mtl_compiler -s ../src/nominal.mtl ../nominal.bin
+
+copy:
+	cp tagtag_fw/nominal.bin server/static

@@ -1,5 +1,5 @@
-[submodule "firmware/v2/mtl_linux"]
-	path = firmware/v2/mtl_linux
+[submodule "tagtag_fw/mtl_linux"]
+	path = tagtag_fw/mtl_linux
 	url = https://github.com/RedoXyde/mtl_linux
 	ignore = dirty
 
