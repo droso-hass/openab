@@ -1,4 +1,4 @@
-module github.com/drosocode/openab
+module github.com/droso-hass/openab
 
 go 1.21
 
