@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/droso-hass/openab/internal/config"
-	"github.com/droso-hass/openab/internal/utils"
-	v2 "github.com/droso-hass/openab/internal/v2"
+	"github.com/drosocode/openab/internal/config"
+	"github.com/drosocode/openab/internal/utils"
+	v2 "github.com/drosocode/openab/internal/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"

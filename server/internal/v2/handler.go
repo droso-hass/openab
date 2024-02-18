@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/droso-hass/openab/internal/utils"
+	"github.com/drosocode/openab/internal/utils"
 )
 
 var RecDataSize = 4096

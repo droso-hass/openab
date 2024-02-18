@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/droso-hass/openab/internal/utils"
+	"github.com/drosocode/openab/internal/utils"
 	"github.com/go-chi/chi/v5"
 )
 
