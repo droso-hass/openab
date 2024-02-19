@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/droso-hass/openab/internal/udp"
 	"github.com/droso-hass/openab/internal/utils"
 	"github.com/go-chi/chi/v5"
 )
@@ -23,9 +25,12 @@ import (
 // ping: rfid, recordings
 
 var conns = map[string]*NabConn{}
+var v2chan chan udp.UDPPacket
 
-func SetupRoutes(r *chi.Mux) {
+func Init(r *chi.Mux) {
 	r.Mount("/vl/bc.jsp", bootcode())
+	v2chan = make(chan udp.UDPPacket)
+	go handleUDP(v2chan)
 	/*c := New("127.0.0.1:5000", "")
 	e := c.Connect()
 	if e != nil {
@@ -47,26 +52,34 @@ func bootcode() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		slog.Info("new connection from v2", "version", q.Get("v"), "mac", q.Get("m"))
-		utils.SendFile(w, r, "./firmware/v2/nominal.bin", "application/octet-stream")
+		utils.SendFile(w, r, "./static/nominal.bin", "application/octet-stream")
 
 		go func() {
-			addr := utils.GetIPFromRequest(r) + ":5000"
 			time.Sleep(time.Second * 3)
-			slog.Info("connecting to " + addr)
-			mac := q.Get("m")
+
+			ip := utils.GetIPFromRequest(r)
+			tcpAddr := ip + ":5000"
+			slog.Info("connecting to " + tcpAddr)
 
 			// if a connection is already open, close it
-			c, ok := conns[mac]
+			c, ok := conns[ip]
 			if ok {
 				c.Disconnect()
 				c.Connect()
 			} else {
-				c := *New(addr, mac)
+				c := *New(tcpAddr, q.Get("m"))
 				c.Connect()
-				conns[mac] = &c
+				conns[ip] = &c
 			}
 
-			initseq(mac)
+			udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:4000", ip))
+			if err != nil {
+				slog.Error("error parsing udp address", utils.ErrAttr(err))
+			} else {
+				udp.RegisterCallback(udpAddr, v2chan)
+			}
+
+			initseq(ip)
 
 			reader := bufio.NewReader(os.Stdin)
 			for {
@@ -74,7 +87,7 @@ func bootcode() http.HandlerFunc {
 				if err != nil {
 					log.Fatal(err)
 				}
-				err = conns[mac].write(str)
+				err = conns[ip].write(str)
 				if err != nil {
 					fmt.Println(err)
 				}

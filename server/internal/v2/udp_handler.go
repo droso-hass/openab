@@ -3,23 +3,30 @@ package v2
 import (
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/droso-hass/openab/internal/udp"
 	"github.com/droso-hass/openab/internal/utils"
 )
 
-var RecDataSize = 4096
-
-func (n *NabConn) processNabMessage(data []byte) {
-	sdata := string(data)
-	if sdata[0:2] == "08" {
-		err := n.handleRecording(sdata[3:])
-		if err != nil {
-			fmt.Println(err)
+func handleUDP(ch chan udp.UDPPacket) {
+	for {
+		data := <-ch
+		nab, ok := conns[data.Addr.IP.String()]
+		if !ok {
+			slog.Warn("V2: udp packet received but no handler is associated with this ip", "addr", data.Addr)
+			continue
+		}
+		fmt.Printf("%+v\n", data)
+		if data.Type == udp.UDPTypeSound {
+			err := nab.handleRecording(string(data.Data))
+			if err != nil {
+				slog.Warn("V2: error processing recording", utils.ErrAttr(err))
+			}
 		}
 	}
-	fmt.Println(sdata)
 }
 
 func (n *NabConn) handleRecording(rawdata string) error {

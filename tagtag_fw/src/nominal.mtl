@@ -1938,18 +1938,17 @@ fun rfidLoop =
 
 var isRecording;;
 var recBuf;;
-var recTime;;
-var cpt;;
 
+// conn.dstT is the address of the client connected to our tcp server
+// netip is the address of the rabbit
 fun writerecdata data = 
     let strlen data -> len in
-    (
-        set cpt = cpt + 1;
-        // conn.dstT is the address of the client connected to our tcp server
-        // netip is the address of the rabbit
-        udpsend netip 4001 conn.dstT 4000 strcatlist "08;"::(itoa cpt)::";"::data::nil nil
+    if len > 512 then (
+        udpsend netip 4000 conn.dstT 4000 strcatlist "snd"::(strsub data 0 512)::nil nil;
+        writerecdata strsub data 512 nil
+    ) else (
+        udpsend netip 4000 conn.dstT 4000 strcatlist "snd"::data::nil nil
     );;
-
 
 fun cbrec s = 
     writerecdata strtohex s;
@@ -1961,12 +1960,11 @@ fun recorderHandler data =
         if tp == 0 && isRecording > 0 then (
             // stop
             Secholn "recording stopped";
+            led 0 0xFF0000;
             recStop
         ) else if tp == 1 && isRecording <= 0 then (
             // start
             Secholn "recording ...";
-            set recTime = time_ms;
-            set cpt = 0;
             recStart 8000 0 #cbrec
         );;
 

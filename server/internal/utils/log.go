@@ -26,3 +26,7 @@ func SetupLogs(level string) {
 	})
 	slog.SetDefault(slog.New(handler))
 }
+
+func ErrAttr(err error) slog.Attr {
+	return slog.Attr{Key: "error", Value: slog.StringValue(err.Error())}
+}

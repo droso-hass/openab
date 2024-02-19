@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/droso-hass/openab/internal/config"
+	"github.com/droso-hass/openab/internal/udp"
 	"github.com/droso-hass/openab/internal/utils"
 	v2 "github.com/droso-hass/openab/internal/v2"
 	"github.com/go-chi/chi/v5"
@@ -28,11 +29,16 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	v2.SetupRoutes(r)
+	v2.Init(r)
 
-	utils.ServeStatic(r, "/data", http.Dir("./static"))
+	//utils.ServeStatic(r, "/data", http.Dir("./static"))
+
+	err := udp.Start(4000)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	fmt.Println("Ready !")
-	err := http.ListenAndServe(":80", r)
+	err = http.ListenAndServe(":80", r)
 	log.Fatal(err)
 }
