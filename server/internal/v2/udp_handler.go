@@ -19,7 +19,6 @@ func handleUDP(ch chan udp.UDPPacket) {
 			slog.Warn("V2: udp packet received but no handler is associated with this ip", "addr", data.Addr)
 			continue
 		}
-		fmt.Printf("%+v\n", data)
 		if data.Type == udp.UDPTypeSound {
 			err := nab.handleRecording(string(data.Data))
 			if err != nil {

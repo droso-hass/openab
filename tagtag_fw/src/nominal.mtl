@@ -1959,12 +1959,11 @@ fun recorderHandler data =
     let atoi hd x -> tp in
         if tp == 0 && isRecording > 0 then (
             // stop
-            Secholn "recording stopped";
-            led 0 0xFF0000;
+            set isRecording = 0;
             recStop
         ) else if tp == 1 && isRecording <= 0 then (
             // start
-            Secholn "recording ...";
+            set isRecording = 1;
             recStart 8000 0 #cbrec
         );;
 
