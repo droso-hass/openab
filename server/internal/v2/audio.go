@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -53,7 +54,7 @@ func makeWav(data []byte) ([]byte, error) {
 // ffmpeg -i in.wav -acodec pcm_s16le out.wav
 func convertRecording(in []byte) ([]byte, error) {
 	cmd := exec.Command("ffmpeg",
-		"-hide_banner", "-loglevel", "panic",
+		"-hide_banner", "-loglevel", "error",
 		"-i", "pipe:0",
 		"-acodec", "pcm_s16le",
 		"-f", "wav",
@@ -87,6 +88,39 @@ func convertRecording(in []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func convertPlayer() {
+func convertPlayer(input string, ch chan []byte) error {
 	// ffmpeg -i in.wav -vn -ar 44100 -ac 1 -b:a 64k out.mp3
+	cmd := exec.Command("ffmpeg",
+		"-hide_banner", "-loglevel", "error",
+		"-i", input,
+		"-vn",
+		"-ar", "44100",
+		"-ac", "1",
+		"-b:a", "64k",
+		"-f", "mp3",
+		"pipe:1",
+	)
+
+	cmd.Stderr = os.Stderr
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+	go func() {
+		for {
+			buf := make([]byte, 512)
+			n, e := out.Read(buf)
+			if e == io.EOF {
+				break
+			}
+			ch <- buf[0:n]
+		}
+		ch <- nil
+	}()
+	go cmd.Wait()
+	return nil
 }

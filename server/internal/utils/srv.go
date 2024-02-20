@@ -38,7 +38,7 @@ func SendFile(w http.ResponseWriter, r *http.Request, path string, contentType s
 	data, err := os.ReadFile(path)
 	if err != nil {
 		render.Status(r, 404)
-		slog.Error("error reading file", "path", path)
+		slog.Error("error reading file", "path", path, "error", err)
 	}
 	w.Write(data)
 }

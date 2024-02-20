@@ -76,7 +76,7 @@ fun cbsrv cnx code msg=
 fun cbudpsrv msg mac ipfrom= 
   let strsub msg 0 3 -> pktType in (
     if !strcmp pktType "snd" then
-      playerUDPHandler strsub msg 4 nil
+      playerUDPHandler strsub msg 3 nil
   );
 	0;;
 

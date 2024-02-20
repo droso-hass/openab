@@ -1,18 +1,40 @@
+var isPlaying;;
+var audio_fifo;;
+var wav_index = 0;;
+
+fun wavcb i =
+	let hd audio_fifo -> sample in
+    let strlen sample -> len in
+    (
+        if wav_index<len then 
+            set wav_index=wav_index+playFeed sample wav_index nil;
+        if wav_index>=len then
+        (
+            set wav_index=0;
+            set audio_fifo=tl audio_fifo
+        )
+    );
+	0;;
+
+fun playerUDPHandler data =
+    //led 1 0x00FF00;
+    set audio_fifo=conc audio_fifo data::nil;;
 
 fun playerHandler data = 
     let rev split data ";" nil nil -> x in
     let atoi hd x -> tp in
-        if tp == 0 && isRecording > 0 then (
+        if tp == 0 && isPlaying > 0 then (
             // stop
             led 0 0xFF0000;
             Secholn "player stopped";
-            wavstop
-        ) else if tp == 1 && isRecording <= 0 then (
+            set isPlaying = 0;
+            playStop
+        ) else if tp == 1 && isPlaying <= 0 then (
             // start
             led 0 0x00FF00;
             Secholn "player started";
-            wavstarthttp hd tl x;
-            0
+            set isPlaying = 1;
+            playStart 1024 #wavcb
         ) else if tp == 2 then (
             led 0 0x0000FF;
             sndVol atoi hd tl x

@@ -29,14 +29,14 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	v2.Init(r)
-
-	//utils.ServeStatic(r, "/data", http.Dir("./static"))
-
-	err := udp.Start(4000)
+	err := udp.Start(4001)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	v2.Init(r)
+
+	//utils.ServeStatic(r, "/data", http.Dir("./static"))
 
 	fmt.Println("Ready !")
 	err = http.ListenAndServe(":80", r)

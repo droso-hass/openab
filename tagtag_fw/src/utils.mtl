@@ -34,7 +34,9 @@ fun _writetcpconn data index retries =
 
 fun writetcpconn data = _writetcpconn data 0 0;;
 
+
 fun _strtohex key i=
   if i < strlen key then (ctoh strget key i)::_strtohex key i+1;;
+
 fun strtohex key=
   strcatlist _strtohex key 0;;

@@ -5,16 +5,16 @@ import (
 )
 
 type NabConn struct {
-	addr    string
+	ip      string
 	mac     string
 	conn    net.Conn
 	stop    bool
 	recData []byte
 }
 
-func New(addr string, mac string) *NabConn {
+func New(ip string, mac string) *NabConn {
 	return &NabConn{
-		addr:    addr,
+		ip:      ip,
 		mac:     mac,
 		stop:    false,
 		recData: []byte{},
@@ -27,7 +27,7 @@ func (n *NabConn) Disconnect() error {
 }
 
 func (n *NabConn) Connect() error {
-	conn, err := net.Dial("tcp", n.addr)
+	conn, err := net.Dial("tcp", n.ip+":5000")
 	if err != nil {
 		return err
 	}

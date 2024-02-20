@@ -2,6 +2,7 @@ package v2
 
 import (
 	"bufio"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"log/slog"
@@ -31,35 +32,66 @@ func Init(r *chi.Mux) {
 	r.Mount("/vl/bc.jsp", bootcode())
 	v2chan = make(chan udp.UDPPacket)
 	go handleUDP(v2chan)
-	/*c := New("127.0.0.1:5000", "")
+
+	c := *New("127.0.0.1", "")
 	e := c.Connect()
 	if e != nil {
 		log.Fatal(e)
 	}
-	//c.write("03;4;0;00ff00;100;00f200;100")
-	//e = c.write("02;0;0;17;1;0")
-	// c.write("06;1")
-	// conns[m].write("07;2;240")
-	// conns[m].write("07;1;http://192.168.1.102/data/lisa.mp3")
-	e = c.write("00;ping")
+	conns["127.0.0.1"] = &c
+	debug("127.0.0.1")
+}
+
+func debug(m string) {
+	e := conns[m].write("07;2;200")
 	if e != nil {
 		log.Fatal(e)
 	}
-	fmt.Println("ok")*/
+
+	time.Sleep(1 * time.Second)
+	e = conns[m].write("07;1")
+	if e != nil {
+		log.Fatal(e)
+	}
+
+	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:4000", conns[m].ip))
+	if err != nil {
+		log.Fatal(err)
+	}
+	ch := make(chan []byte)
+	err = convertPlayer("./server/static/lisa.mp3", ch)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		x := <-ch
+		if x == nil {
+			break
+		} else if len(x) > 0 {
+			dst := make([]byte, hex.EncodedLen(len(x)))
+			hex.Encode(dst, x)
+			udp.Write(udp.UDPPacket{
+				Addr: uaddr,
+				Type: udp.UDPTypeSound,
+				Data: dst,
+			})
+			time.Sleep(time.Microsecond * 100)
+		}
+	}
+	fmt.Println("ok")
 }
 
 func bootcode() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		slog.Info("new connection from v2", "version", q.Get("v"), "mac", q.Get("m"))
-		utils.SendFile(w, r, "./static/nominal.bin", "application/octet-stream")
+		utils.SendFile(w, r, "./server/static/nominal.bin", "application/octet-stream")
 
 		go func() {
 			time.Sleep(time.Second * 3)
 
 			ip := utils.GetIPFromRequest(r)
-			tcpAddr := ip + ":5000"
-			slog.Info("connecting to " + tcpAddr)
+			slog.Info("connecting to " + ip)
 
 			// if a connection is already open, close it
 			c, ok := conns[ip]
@@ -67,8 +99,11 @@ func bootcode() http.HandlerFunc {
 				c.Disconnect()
 				c.Connect()
 			} else {
-				c := *New(tcpAddr, q.Get("m"))
-				c.Connect()
+				c := *New(ip, q.Get("m"))
+				err := c.Connect()
+				if err != nil {
+					log.Fatal(err)
+				}
 				conns[ip] = &c
 			}
 
@@ -79,7 +114,9 @@ func bootcode() http.HandlerFunc {
 				udp.RegisterCallback(udpAddr, v2chan)
 			}
 
-			initseq(ip)
+			time.Sleep(time.Second * 2)
+			//initseq(ip)
+			debug(ip)
 
 			reader := bufio.NewReader(os.Stdin)
 			for {
@@ -97,7 +134,6 @@ func bootcode() http.HandlerFunc {
 }
 
 func initseq(m string) {
-	time.Sleep(time.Second * 2)
 	green_breath := "03;4;0;00FF00;100;00EE00;100;00DD00;100;00CC00;100;00BB00;100;00AA00;100;009900;100;008800;100;007700;100;006600;100;005500;100;004400;100;003300;100;002200;100;001100;100;000000;100;001100;100;002200;100;003300;100;004400;100;005500;100;006600;100;007700;100;008800;100;009900;100;00AA00;100;00BB00;100;00CC00;100;00DD00;100;00EE00;100"
 	conns[m].write(green_breath + "\n02;0;0;0;1;0\n02;1;0;0;1;0")
 	/*time.Sleep(time.Second * 2)

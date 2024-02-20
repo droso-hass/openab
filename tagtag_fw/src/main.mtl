@@ -26,7 +26,6 @@ var SIMU;;
 #include lib/std/wifi.mtl
 #include lib/net/http.mtl
 #include lib/std/audiolib.mtl
-//#include lib/std/reclib.mtl
 
 #include utils.mtl
 #include led.mtl
@@ -57,7 +56,7 @@ fun main=
     netstart;
     startdnsclient;
     mainSetup;
-    startsocketserver 5000;
+    startserver 5000 4000;
     loopcb #mainLoop;
     Secholn "hello world ------------";
     0;;

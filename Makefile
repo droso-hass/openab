@@ -1,7 +1,7 @@
 
 all: v2-fw server
 
-server: server/internal/* server/main.go server/go.mod server/go.sum
+server: server/*
 	cd server && go build
 
 v2-metalc: tagtag_fw/mtl_linux/*

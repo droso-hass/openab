@@ -1645,7 +1645,6 @@ fun wavtime =
 
 }
 //------------ END ./lib/std/audiolib.mtl ------------
-//#include lib/std/reclib.mtl
 
 
 
@@ -1686,11 +1685,19 @@ fun _writetcpconn data index retries =
 
 fun writetcpconn data = _writetcpconn data 0 0;;
 
+
 fun _strtohex key i=
   if i < strlen key then (ctoh strget key i)::_strtohex key i+1;;
+
 fun strtohex key=
   strcatlist _strtohex key 0;;
+/*
+fun _hextostr data i=
+  if i < strlen data then (itoa (htoi (strsub data i 2)))::_hextostr data i+2;;
 
+fun hextostr data=
+  strcatlist _hextostr data 0;;
+*/
 //------------ END ./utils.mtl ------------
 
 
@@ -1937,7 +1944,6 @@ fun rfidLoop =
 //------------ BEGIN ./recorder.mtl ------------
 
 var isRecording;;
-var recBuf;;
 
 // conn.dstT is the address of the client connected to our tcp server
 // netip is the address of the rabbit
@@ -1951,7 +1957,7 @@ fun writerecdata data =
     );;
 
 fun cbrec s = 
-    writerecdata strtohex s;
+    writerecdata s;
     0;;
 
 fun recorderHandler data = 
@@ -1971,21 +1977,44 @@ fun recorderHandler data =
 
 
 //------------ BEGIN ./player.mtl ------------
+var isPlaying;;
+var audio_fifo;;
+var wav_index = 0;;
+
+fun wavcb i =
+	let hd audio_fifo -> sample in
+    let strlen sample -> len in
+    (
+        if wav_index<len then 
+            set wav_index=wav_index+playFeed sample wav_index nil;
+        if wav_index>=len then
+        (
+            set wav_index=0;
+            set audio_fifo=tl audio_fifo
+        )
+    );
+	0;;
+
+fun playerUDPHandler data =
+    led 1 0x00FF00;
+    Secholn data;
+    set audio_fifo=conc audio_fifo data::nil;;
 
 fun playerHandler data = 
     let rev split data ";" nil nil -> x in
     let atoi hd x -> tp in
-        if tp == 0 && isRecording > 0 then (
+        if tp == 0 && isPlaying > 0 then (
             // stop
             led 0 0xFF0000;
             Secholn "player stopped";
-            wavstop
-        ) else if tp == 1 && isRecording <= 0 then (
+            set isPlaying = 0;
+            playStop
+        ) else if tp == 1 && isPlaying <= 0 then (
             // start
             led 0 0x00FF00;
             Secholn "player started";
-            wavstarthttp hd tl x;
-            0
+            set isPlaying = 1;
+            playStart 1024 #wavcb
         ) else if tp == 2 then (
             led 0 0x0000FF;
             sndVol atoi hd tl x
@@ -2074,9 +2103,18 @@ fun cbsrv cnx code msg=
     tcpcb cnx #tcpevent;
     0;;
 
-fun startsocketserver port=
-    listentcp port #cbsrv;
-    Secholn "start socket server";
+fun cbudpsrv msg mac ipfrom= 
+  Secholn msg;
+  let strsub msg 0 3 -> pktType in (
+    if !strcmp pktType "snd" then
+      playerUDPHandler strsub msg 3 nil
+  );
+	0;;
+
+fun startserver tcpport udpport=
+    regudp udpport #cbudpsrv;
+    listentcp tcpport #cbsrv;
+    Secholn "start server";
     0;;
 
 //------------ END ./server.mtl ------------
@@ -2102,7 +2140,7 @@ fun main=
     netstart;
     startdnsclient;
     mainSetup;
-    startsocketserver 5000;
+    startserver 5000 4000;
     loopcb #mainLoop;
     Secholn "hello world ------------";
     0;;
