@@ -1,7 +1,6 @@
 package v2
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -20,7 +19,7 @@ func handleUDP(ch chan udp.UDPPacket) {
 			continue
 		}
 		if data.Type == udp.UDPTypeSound {
-			err := nab.handleRecording(string(data.Data))
+			err := nab.handleRecording(data.Data)
 			if err != nil {
 				slog.Warn("V2: error processing recording", utils.ErrAttr(err))
 			}
@@ -28,7 +27,7 @@ func handleUDP(ch chan udp.UDPPacket) {
 	}
 }
 
-func (n *NabConn) handleRecording(rawdata string) error {
+func (n *NabConn) handleRecording(rawdata []byte) error {
 	if len(n.recData) >= RecDataSize {
 		wav, err := makeWav(n.recData)
 		if err != nil {
@@ -38,17 +37,13 @@ func (n *NabConn) handleRecording(rawdata string) error {
 		if err != nil {
 			return err
 		}
-		filename := fmt.Sprintf("./rec/%s_%d.wav", strings.Replace(n.mac, ":", "", -1), time.Now().Unix())
+		filename := fmt.Sprintf("./server/rec/%s_%d.wav", strings.Replace(n.mac, ":", "", -1), time.Now().Unix())
 		err = utils.WriteFile(filename, filedata)
 		if err != nil {
 			return err
 		}
 		n.recData = []byte{}
 	}
-	h, err := hex.DecodeString(rawdata)
-	if err != nil {
-		return err
-	}
-	n.recData = append(n.recData, h...)
+	n.recData = append(n.recData, rawdata...)
 	return nil
 }

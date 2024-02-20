@@ -25,7 +25,7 @@ fun writerecdata data =
 #endif
 
 fun cbrec s = 
-    writerecdata strtohex s;
+    writerecdata s;
     0;;
 
 fun recorderHandler data = 
