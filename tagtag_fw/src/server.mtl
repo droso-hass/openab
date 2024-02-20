@@ -73,7 +73,15 @@ fun cbsrv cnx code msg=
     tcpcb cnx #tcpevent;
     0;;
 
-fun startsocketserver port=
-    listentcp port #cbsrv;
-    Secholn "start socket server";
+fun cbudpsrv msg mac ipfrom= 
+  let strsub msg 0 3 -> pktType in (
+    if !strcmp pktType "snd" then
+      playerUDPHandler strsub msg 4 nil
+  );
+	0;;
+
+fun startserver tcpport udpport=
+    regudp udpport #cbudpsrv;
+    listentcp tcpport #cbsrv;
+    Secholn "start server";
     0;;
