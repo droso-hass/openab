@@ -2,7 +2,6 @@ package v2
 
 import (
 	"bufio"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"log/slog"
@@ -32,27 +31,60 @@ func Init(r *chi.Mux) {
 	r.Mount("/vl/bc.jsp", bootcode())
 	v2chan = make(chan udp.UDPPacket)
 	go handleUDP(v2chan)
+	/*
+	   c := *New("127.0.0.1", "")
+	   e := c.Connect()
 
-	c := *New("127.0.0.1", "")
-	e := c.Connect()
-	if e != nil {
-		log.Fatal(e)
+	   	if e != nil {
+	   		log.Fatal(e)
+	   	}
+
+	   conns["127.0.0.1"] = &c
+	   debug("127.0.0.1")
+	*/
+}
+
+func fftest() {
+	ch := make(chan []byte)
+	err := convertPlayer("./static/lisa.mp3", ch)
+	if err != nil {
+		log.Fatal(err)
 	}
-	conns["127.0.0.1"] = &c
-	debug("127.0.0.1")
+	f, err := os.OpenFile("./static/lisanab.mp3", os.O_WRONLY|os.O_CREATE, 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		x := <-ch
+		if x == nil {
+			break
+		} else if len(x) > 0 {
+			_, err = f.Write(x)
+			if err != nil {
+				log.Fatal(err)
+			}
+			//time.Sleep(time.Microsecond * 100)
+		}
+	}
+	err = f.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func debug(m string) {
-	e := conns[m].write("07;2;200")
+	/*e := conns[m].write("07;2;255")
 	if e != nil {
 		log.Fatal(e)
-	}
+	}*/
 
-	time.Sleep(1 * time.Second)
-	e = conns[m].write("07;1")
-	if e != nil {
-		log.Fatal(e)
-	}
+	go func() {
+		time.Sleep(2 * time.Second)
+		e := conns[m].write("07;1")
+		if e != nil {
+			log.Fatal(e)
+		}
+	}()
 
 	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:4000", conns[m].ip))
 	if err != nil {
@@ -68,14 +100,12 @@ func debug(m string) {
 		if x == nil {
 			break
 		} else if len(x) > 0 {
-			dst := make([]byte, hex.EncodedLen(len(x)))
-			hex.Encode(dst, x)
 			udp.Write(udp.UDPPacket{
 				Addr: uaddr,
 				Type: udp.UDPTypeSound,
-				Data: dst,
+				Data: x,
 			})
-			time.Sleep(time.Microsecond * 100)
+			time.Sleep(time.Second * 1)
 		}
 	}
 	fmt.Println("ok")
@@ -86,6 +116,7 @@ func bootcode() http.HandlerFunc {
 		q := r.URL.Query()
 		slog.Info("new connection from v2", "version", q.Get("v"), "mac", q.Get("m"))
 		utils.SendFile(w, r, "./server/static/nominal.bin", "application/octet-stream")
+		//utils.SendFile(w, r, "./static/bc.jsp", "application/octet-stream")
 
 		go func() {
 			time.Sleep(time.Second * 3)

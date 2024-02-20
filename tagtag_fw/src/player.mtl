@@ -3,13 +3,18 @@ var audio_fifo;;
 var wav_index = 0;;
 
 fun wavcb i =
+    led 1 0x000000;
+    led 3 0x000000;
 	let hd audio_fifo -> sample in
     let strlen sample -> len in
     (
-        if wav_index<len then 
-            set wav_index=wav_index+playFeed sample wav_index nil;
+        if wav_index<len then (
+            led 1 0x0000FF;
+            set wav_index=wav_index+playFeed sample wav_index i
+        );
         if wav_index>=len then
         (
+            led 3 0xFF0000;
             set wav_index=0;
             set audio_fifo=tl audio_fifo
         )
@@ -17,7 +22,7 @@ fun wavcb i =
 	0;;
 
 fun playerUDPHandler data =
-    //led 1 0x00FF00;
+    led 1 0x00FF00;
     set audio_fifo=conc audio_fifo data::nil;;
 
 fun playerHandler data = 
@@ -35,10 +40,10 @@ fun playerHandler data =
             Secholn "player started";
             set isPlaying = 1;
             playStart 1024 #wavcb
-        ) else if tp == 2 then (
+        ) /*else if tp == 2 then (
             led 0 0x0000FF;
             sndVol atoi hd tl x
-        )
+        )*/
         ;;
 
 fun midiHandler data = 

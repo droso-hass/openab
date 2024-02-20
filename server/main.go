@@ -36,7 +36,7 @@ func main() {
 
 	v2.Init(r)
 
-	//utils.ServeStatic(r, "/data", http.Dir("./static"))
+	utils.ServeStatic(r, "/data", http.Dir("./static"))
 
 	fmt.Println("Ready !")
 	err = http.ListenAndServe(":80", r)
