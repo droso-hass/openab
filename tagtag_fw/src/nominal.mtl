@@ -2002,7 +2002,7 @@ fun wavcb i =
             set audio_fifo=tl audio_fifo;
             set wav_index=0;
             //if buf_size+chunk_size <= max_size then (
-            if buf_size < 1500 then (
+            if buf_size < (WAV_BUFFER_MAXSIZE-4096) then (
                 led 1 0x0000FF;
                 writetcpconn "07;3"
             )
@@ -2013,12 +2013,12 @@ fun wavcb i =
 fun playerUDPHandler data =
     set buf_size = buf_size + strlen data;
     set audio_fifo=conc audio_fifo data::nil;
-    if buf_size >= 2000 && isPlaying == 0 then (
+    if buf_size >= WAV_BUFFER_STARTSIZE && isPlaying == 0 then (
         led 2 0x00FFFF;
         set isPlaying = 1;
         set wav_index = 0;
         playStart 1024 #wavcb
-    ) else if buf_size < 2000 then (
+    ) else if buf_size < WAV_BUFFER_MAXSIZE && isPlaying == 0 then (
         writetcpconn "07;3"
     )
     ;;

@@ -101,7 +101,7 @@ func debug(m string) {
 		if x == nil {
 			break
 		} else if l := len(x); l > 0 {
-			if conns[m].playWritten+l > 1024 {
+			if conns[m].playWritten+l > 4096 {
 				fmt.Println("stop")
 				conns[m].playMtx.Lock()
 				conns[m].playWritten = 0
