@@ -1,44 +1,69 @@
-var isPlaying;;
+var isPlaying = 0;;
 var audio_fifo;;
 var wav_index = 0;;
+// flow control
+var buf_size = 0;;
+var chunk_size = 512;;
+var max_size = 4*512;;
+
+
+var WAV_BUFFER_STARTSIZE=80000;;
+var WAV_BUFFER_MAXSIZE=400000;;
 
 fun wavcb i =
     led 1 0x000000;
     led 3 0x000000;
 	let hd audio_fifo -> sample in
-    let strlen sample -> len in
     (
-        if wav_index<len then (
-            led 1 0x0000FF;
-            set wav_index=wav_index+playFeed sample wav_index i
-        );
-        if wav_index>=len then
-        (
-            led 3 0xFF0000;
+        if sample == nil then (
+            led 1 0xFF0000
+        )
+        else if wav_index<strlen sample then (
+            led 1 0x00FF00;
+            let playFeed sample wav_index i -> written in (
+                set buf_size = buf_size - written;
+                set wav_index = wav_index + written
+            )
+        )
+        else (
+            set audio_fifo=tl audio_fifo;
             set wav_index=0;
-            set audio_fifo=tl audio_fifo
+            //if buf_size+chunk_size <= max_size then (
+            if buf_size < 1500 then (
+                led 1 0x0000FF;
+                writetcpconn "07;3"
+            )
         )
     );
 	0;;
 
 fun playerUDPHandler data =
-    led 1 0x00FF00;
-    set audio_fifo=conc audio_fifo data::nil;;
+    set buf_size = buf_size + strlen data;
+    set audio_fifo=conc audio_fifo data::nil;
+    if buf_size >= 2000 && isPlaying == 0 then (
+        led 2 0x00FFFF;
+        set isPlaying = 1;
+        set wav_index = 0;
+        playStart 1024 #wavcb
+    ) else if buf_size < 2000 then (
+        writetcpconn "07;3"
+    )
+    ;;
 
 fun playerHandler data = 
     let rev split data ";" nil nil -> x in
     let atoi hd x -> tp in
         if tp == 0 && isPlaying > 0 then (
             // stop
-            led 0 0xFF0000;
             Secholn "player stopped";
             set isPlaying = 0;
             playStop
         ) else if tp == 1 && isPlaying <= 0 then (
             // start
-            led 0 0x00FF00;
             Secholn "player started";
             set isPlaying = 1;
+            set buf_size = 0;
+            set wav_index = 0;
             playStart 1024 #wavcb
         ) /*else if tp == 2 then (
             led 0 0x0000FF;

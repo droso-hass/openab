@@ -19,7 +19,7 @@ Max Size is x
 |04|Button event|Type (1: click, 2: double click, 3: long click)|
 |05|Rfid Read|rfid id|
 |06|Recorder|Type (0: stop, 1: start)|
-|07|Player|Type (0: stop, 1: start, 2: volume); Volume (only for type 2, percentage); Linkto media (only for type 1)|
+|07|Player|Type (0: stop, 1: start, 2: volume, 3: udp flow, 4: udp pause); Volume (only for type 2, percentage); Linkto media (only for type 1)|
 |08|Record Data|audio chunk|
 |09|Play Midi|bytes|
 |10|Wheel status|Value (0-255)|

@@ -78,13 +78,14 @@ func debug(m string) {
 		log.Fatal(e)
 	}*/
 
-	go func() {
-		time.Sleep(2 * time.Second)
-		e := conns[m].write("07;1")
-		if e != nil {
-			log.Fatal(e)
-		}
-	}()
+	/*e := conns[m].write("07;1")
+	if e != nil {
+		log.Fatal(e)
+	}*/
+	e := conns[m].write("00;ping")
+	if e != nil {
+		log.Fatal(e)
+	}
 
 	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:4000", conns[m].ip))
 	if err != nil {
@@ -99,13 +100,20 @@ func debug(m string) {
 		x := <-ch
 		if x == nil {
 			break
-		} else if len(x) > 0 {
+		} else if l := len(x); l > 0 {
+			if conns[m].playWritten+l > 1024 {
+				fmt.Println("stop")
+				conns[m].playMtx.Lock()
+				conns[m].playWritten = 0
+			}
 			udp.Write(udp.UDPPacket{
 				Addr: uaddr,
 				Type: udp.UDPTypeSound,
 				Data: x,
 			})
-			time.Sleep(time.Second * 1)
+			conns[m].playWritten += l
+			fmt.Println("udpw")
+			//time.Sleep(time.Second * 1)
 		}
 	}
 	fmt.Println("ok")

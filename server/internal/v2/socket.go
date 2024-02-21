@@ -2,23 +2,30 @@ package v2
 
 import (
 	"net"
+	"sync"
 )
 
 type NabConn struct {
-	ip      string
-	mac     string
-	conn    net.Conn
-	stop    bool
-	recData []byte
+	ip          string
+	mac         string
+	conn        net.Conn
+	stop        bool
+	recData     []byte
+	playMtx     sync.Mutex
+	playWritten int
 }
 
 func New(ip string, mac string) *NabConn {
-	return &NabConn{
-		ip:      ip,
-		mac:     mac,
-		stop:    false,
-		recData: []byte{},
+	n := NabConn{
+		ip:          ip,
+		mac:         mac,
+		stop:        false,
+		recData:     []byte{},
+		playMtx:     sync.Mutex{},
+		playWritten: 0,
 	}
+	//n.playMtx.Acquire(context.Background(), 2)
+	return &n
 }
 
 func (n *NabConn) Disconnect() error {

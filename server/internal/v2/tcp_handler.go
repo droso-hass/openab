@@ -8,7 +8,11 @@ var RecDataSize = 4096
 
 func (n *NabConn) processNabMessage(data []byte) {
 	sdata := string(data)
-	/*if sdata[0:2] == "08" {
-	}*/
 	fmt.Println(sdata)
+	if sdata[0:2] == "07" {
+		if sdata[3:4] == "3" {
+			// allow next packet
+			n.playMtx.Unlock()
+		}
+	}
 }
