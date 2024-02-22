@@ -1,28 +1,14 @@
 
 var isRecording;;
 
-// conn.dstT is the address of the client connected to our tcp server
-// netip is the address of the rabbit
-#ifdef SIMU
 fun writerecdata data = 
     let strlen data -> len in
     if len > 512 then (
-        udpsend netip 4000 "\127\0\0\1" 4000 strcatlist "snd"::(strsub data 0 512)::nil nil;
+        writeudpconn strcatlist "snd"::(strsub data 0 512)::nil;
         writerecdata strsub data 512 nil
     ) else (
-        udpsend netip 4000 "\127\0\0\1" 4000 strcatlist "snd"::data::nil nil
+        writeudpconn strcatlist "snd"::data::nil
     );;
-#endif
-#ifndef SIMU
-fun writerecdata data = 
-    let strlen data -> len in
-    if len > 512 then (
-        udpsend netip 4000 conn.dstT 4000 strcatlist "snd"::(strsub data 0 512)::nil nil;
-        writerecdata strsub data 512 nil
-    ) else (
-        udpsend netip 4000 conn.dstT 4000 strcatlist "snd"::data::nil nil
-    );;
-#endif
 
 fun cbrec s = 
     writerecdata s;

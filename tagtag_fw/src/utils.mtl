@@ -34,6 +34,16 @@ fun _writetcpconn data index retries =
 
 fun writetcpconn data = _writetcpconn data 0 0;;
 
+// conn.dstT is the address of the client connected to our tcp server
+// netip is the address of the rabbit
+#ifdef SIMU
+fun writeudpconn data = 
+  udpsend netip 4000 "\127\0\0\1" 4000 data nil;;
+#endif
+#ifndef SIMU
+fun writeudpconn data = 
+  udpsend netip 4000 conn.dstT 4000 data nil;;
+#endif
 
 fun _strtohex key i=
   if i < strlen key then (ctoh strget key i)::_strtohex key i+1;;
