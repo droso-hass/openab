@@ -88,7 +88,7 @@ func convertRecording(in []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func convertPlayer(input string, ch chan []byte) error {
+func convertPlayer(input string, ch chan []byte, chunkSize int) error {
 	// ffmpeg -i in.wav -vn -ar 44100 -ac 1 -b:a 64k out.mp3
 	cmd := exec.Command("ffmpeg",
 		"-hide_banner", "-loglevel", "error",
@@ -112,7 +112,7 @@ func convertPlayer(input string, ch chan []byte) error {
 	}
 	go func() {
 		for {
-			buf := make([]byte, 512)
+			buf := make([]byte, chunkSize)
 			n, e := out.Read(buf)
 			if e == io.EOF {
 				break
