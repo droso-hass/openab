@@ -3,23 +3,56 @@ var audio_fifo;;
 var wav_index = 0;;
 // flow control
 var buf_size = 0;;
-var chunk_size = 512;;
-var max_size = 4*512;;
+var last_audio_packet = 0;;
+var request_new_packet = 0;;
 
-
+var packet_cpt=0;; // to send ack
+var PACKET_RETRY=500;; //ms
+var PACKET_END=1000;; //ms
 var WAV_BUFFER_STARTSIZE=80000;;
+//var WAV_BUFFER_STARTSIZE=10000;;
 var WAV_BUFFER_MAXSIZE=400000;;
+
+fun stopPlayer = 
+    Secholn "player stopped";
+    playStop;
+    set isPlaying = 0;
+    set last_audio_packet = 0;
+    set audio_fifo = nil;
+    set wav_index = 0;
+    set request_new_packet = 0;
+    set buf_size = 0
+    ;;
+
+fun requestAudio = 
+    set request_new_packet = 1;
+    writeudpconn strcatlist "ssd"::(itoa packet_cpt)::nil;;
 
 fun wavcb i =
     led 1 0x000000;
+    led 2 0x000000;
     led 3 0x000000;
+    if buf_size > 1000 then (
+        led 1 0x00FF00
+    );
+    if buf_size > 80000 then (
+        led 2 0x00FF00
+    );
+    if buf_size > 100000 then (
+        led 3 0x00FF00
+    );
 	let hd audio_fifo -> sample in
     (
         if sample == nil then (
-            led 1 0xFF0000
+            //led 1 0xFF0000;
+            if time_ms > last_audio_packet+PACKET_END then (
+                stopPlayer;
+                // signal that player is stopped
+                writetcpconn "07;0"
+            )
         )
         else if wav_index<strlen sample then (
-            led 1 0x00FF00;
+            //led 1 0x00FF00;
             let playFeed sample wav_index i -> written in (
                 set buf_size = buf_size - written;
                 set wav_index = wav_index + written
@@ -27,44 +60,54 @@ fun wavcb i =
         )
         else (
             set audio_fifo=tl audio_fifo;
-            set wav_index=0;
-            //if buf_size+chunk_size <= max_size then (
-            if buf_size < (WAV_BUFFER_MAXSIZE-4096) then (
-                led 1 0x0000FF;
-                writetcpconn "07;3"
-            )
+            set wav_index=0
         )
     );
 	0;;
 
+fun startPlayer =
+    Secholn "player started";
+    set isPlaying = 1;
+    set buf_size = 0;
+    set wav_index = 0;
+    playStart 1024 #wavcb
+    ;;
+
 fun playerUDPHandler data =
-    set buf_size = buf_size + strlen data;
-    set audio_fifo=conc audio_fifo data::nil;
-    if buf_size >= WAV_BUFFER_STARTSIZE && isPlaying == 0 then (
-        led 2 0x00FFFF;
-        set isPlaying = 1;
-        set wav_index = 0;
-        playStart 1024 #wavcb
-    ) else if buf_size < WAV_BUFFER_MAXSIZE && isPlaying == 0 then (
-        writetcpconn "07;3"
+    set packet_cpt = atoi strsub data 0 3;
+    set request_new_packet = 0;
+    set last_audio_packet = time_ms;
+    let strsub data 3 nil -> dt in (
+        set buf_size = buf_size + strlen dt;
+        set audio_fifo=conc audio_fifo dt::nil;
+        if buf_size >= WAV_BUFFER_STARTSIZE && isPlaying == 0 then (
+            led 0 0x00FFFF;
+            // signal that player is auto started
+            writetcpconn "07;1";
+            startPlayer
+        ) else if buf_size < WAV_BUFFER_MAXSIZE && isPlaying == 0 then (
+            requestAudio
+        )
     )
     ;;
+
+fun playerLoop =
+    if request_new_packet == 1 && time_ms > last_audio_packet+PACKET_RETRY then (
+        requestAudio
+    ) else if request_new_packet == 0 && isPlaying == 1 && buf_size < (WAV_BUFFER_MAXSIZE-6144) then (
+        //led 1 0x0000FF;
+        requestAudio
+    );;
 
 fun playerHandler data = 
     let rev split data ";" nil nil -> x in
     let atoi hd x -> tp in
         if tp == 0 && isPlaying > 0 then (
             // stop
-            Secholn "player stopped";
-            set isPlaying = 0;
-            playStop
+            stopPlayer
         ) else if tp == 1 && isPlaying <= 0 then (
             // start
-            Secholn "player started";
-            set isPlaying = 1;
-            set buf_size = 0;
-            set wav_index = 0;
-            playStart 1024 #wavcb
+            startPlayer
         ) /*else if tp == 2 then (
             led 0 0x0000FF;
             sndVol atoi hd tl x

@@ -18,5 +18,6 @@ type UDPPacket struct {
 }
 
 const (
-	UDPTypeSound = "snd"
+	UDPTypeSoundData = "snd"
+	UDPTypeSoundSend = "ssd"
 )

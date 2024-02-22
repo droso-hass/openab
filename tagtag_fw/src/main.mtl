@@ -46,6 +46,7 @@ fun mainLoop =
     earLoop;
     buttonLoop;
     rfidLoop;
+    playerLoop;
     //Secholn "loop";
     0;;
 

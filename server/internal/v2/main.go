@@ -46,7 +46,7 @@ func Init(r *chi.Mux) {
 
 func fftest() {
 	ch := make(chan []byte)
-	err := convertPlayer("./static/lisa.mp3", ch)
+	err := convertPlayer("./static/lisa.mp3", ch, 512)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,31 +92,44 @@ func debug(m string) {
 		log.Fatal(err)
 	}
 	ch := make(chan []byte)
-	err = convertPlayer("./server/static/lisa.mp3", ch)
+	err = convertPlayer("./server/static/lisa.mp3", ch, 1024)
 	if err != nil {
 		log.Fatal(err)
 	}
+	var lastPacket []byte = nil
 	for {
-		x := <-ch
-		if x == nil {
-			break
-		} else if l := len(x); l > 0 {
-			if conns[m].playWritten+l > 4096 {
-				fmt.Println("stop")
-				conns[m].playMtx.Lock()
-				conns[m].playWritten = 0
-			}
+		conns[m].playMtx.Lock()
+		conns[m].playMtxLocked = true
+
+		if lastPacket != nil && conns[m].playLastSent > conns[m].playLastAck {
+			fmt.Printf("-------- %d %d\n", conns[m].playLastSent, conns[m].playLastAck)
+			p := []byte(fmt.Sprintf("%03d", conns[m].playLastSent))
+			// replay last packet
 			udp.Write(udp.UDPPacket{
 				Addr: uaddr,
-				Type: udp.UDPTypeSound,
-				Data: x,
+				Type: udp.UDPTypeSoundData,
+				Data: append(p, lastPacket...),
 			})
-			conns[m].playWritten += l
-			fmt.Println("udpw")
-			//time.Sleep(time.Second * 1)
+		} else {
+			conns[m].playLastSent++
+			p := []byte(fmt.Sprintf("%03d", conns[m].playLastSent))
+			for {
+				x := <-ch
+				if x == nil {
+					return
+				} else if l := len(x); l > 0 {
+					lastPacket = x
+					udp.Write(udp.UDPPacket{
+						Addr: uaddr,
+						Type: udp.UDPTypeSoundData,
+						Data: append(p, x...),
+					})
+					break
+				}
+			}
 		}
+		fmt.Println(conns[m].playLastSent)
 	}
-	fmt.Println("ok")
 }
 
 func bootcode() http.HandlerFunc {

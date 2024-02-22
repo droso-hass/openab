@@ -6,25 +6,28 @@ import (
 )
 
 type NabConn struct {
-	ip          string
-	mac         string
-	conn        net.Conn
-	stop        bool
-	recData     []byte
-	playMtx     sync.Mutex
-	playWritten int
+	ip            string
+	mac           string
+	conn          net.Conn
+	stop          bool
+	recData       []byte
+	playMtx       sync.Mutex
+	playMtxLocked bool
+	playLastSent  uint8
+	playLastAck   uint8
 }
 
 func New(ip string, mac string) *NabConn {
 	n := NabConn{
-		ip:          ip,
-		mac:         mac,
-		stop:        false,
-		recData:     []byte{},
-		playMtx:     sync.Mutex{},
-		playWritten: 0,
+		ip:            ip,
+		mac:           mac,
+		stop:          false,
+		recData:       []byte{},
+		playMtx:       sync.Mutex{},
+		playMtxLocked: false,
+		playLastSent:  0,
+		playLastAck:   0,
 	}
-	//n.playMtx.Acquire(context.Background(), 2)
 	return &n
 }
 

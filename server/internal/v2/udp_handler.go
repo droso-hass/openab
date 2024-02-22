@@ -3,6 +3,7 @@ package v2
 import (
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,10 +19,26 @@ func handleUDP(ch chan udp.UDPPacket) {
 			slog.Warn("V2: udp packet received but no handler is associated with this ip", "addr", data.Addr)
 			continue
 		}
-		if data.Type == udp.UDPTypeSound {
+		if data.Type == udp.UDPTypeSoundData {
 			err := nab.handleRecording(data.Data)
 			if err != nil {
 				slog.Warn("V2: error processing recording", utils.ErrAttr(err))
+			}
+		} else if data.Type == udp.UDPTypeSoundSend {
+			// allow next packet
+			i, err := strconv.ParseUint(string(data.Data), 10, 8)
+			if err == nil {
+				ii := uint8(i)
+				if ii != nab.playLastAck {
+					nab.playLastAck = ii
+					fmt.Printf("ack: %d\n", nab.playLastAck)
+					if nab.playMtxLocked {
+						nab.playMtxLocked = false
+						nab.playMtx.Unlock()
+					}
+				}
+			} else {
+				fmt.Println(err)
 			}
 		}
 	}
