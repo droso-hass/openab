@@ -97,7 +97,7 @@ fun earLoop =
                         if es.reported == 0 && es.lastPosTime + 500 < time_ms then (
                             Secholn "reporting change";
                             // if last state have changed but is stable for 500ms, send update to server
-                            writetcpconn strcatlist "11;"::(itoa i)::";"::(itoa es.lastPos)::nil;
+                            writetcpconn strcatlist "10;"::(itoa i)::";"::(itoa es.lastPos)::nil;
                             set earState.i = [lastTime: es.lastTime targetPos: es.targetPos isMoving: es.isMoving isBroken: es.isBroken lastPos: es.lastPos lastPosTime: es.lastPosTime reported: 1]
                         );
                         

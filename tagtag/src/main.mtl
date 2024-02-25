@@ -59,6 +59,6 @@ fun main=
     mainSetup;
     startserver 5000 4000;
     loopcb #mainLoop;
-    sndVol 100;
+    sndVol 50;
     Secholn "hello world ------------";
     0;;

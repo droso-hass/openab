@@ -1,5 +1,5 @@
-[submodule "tagtag_fw/mtl_linux"]
-	path = tagtag_fw/mtl_linux
+[submodule "tagtag/mtl_linux"]
+	path = tagtag/mtl_linux
 	url = https://github.com/RedoXyde/mtl_linux
 	ignore = dirty
 

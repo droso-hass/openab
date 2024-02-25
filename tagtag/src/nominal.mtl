@@ -2070,8 +2070,8 @@ fun playerLoop =
     if request_new_packet == 1 && time_ms > last_audio_packet+PACKET_RETRY then (
         requestAudio
     ) else if request_new_packet == 0 && isPlaying == 1 && buf_size < (WAV_BUFFER_MAXSIZE-6144) then (
-            //led 1 0x0000FF;
-            requestAudio
+        //led 1 0x0000FF;
+        requestAudio
     );;
 
 fun playerHandler data = 
@@ -2210,7 +2210,7 @@ fun main=
     mainSetup;
     startserver 5000 4000;
     loopcb #mainLoop;
-    sndVol 100;
+    sndVol 50;
     Secholn "hello world ------------";
     0;;
 

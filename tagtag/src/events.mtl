@@ -16,7 +16,7 @@ fun buttonLoop =
         )
         else if wheel.reported == 0 && wheel.last_time + 500 < time_ms then (
             set wheel = [last_time: wheel.last_time last_state: wheel.last_state reported: 1 nbclick: 0];
-            writetcpconn strcatlist "10;"::(itoa wheel.last_state)::nil
+            writetcpconn strcatlist "09;"::(itoa wheel.last_state)::nil
         );
     
     let button2 -> b in (
