@@ -1,0 +1,363 @@
+asyncapi: 3.0.0
+info:
+  title: OPENAB API
+  version: 1.0.0
+  description: NATS API for the OpenNab server
+  contact:
+    name: Github
+    url: https://github.com/droso-hass/openab/
+  externalDocs:
+    url: https://droso-hass.github.io/openab
+  license:
+    name: MIT License
+    url: https://choosealicense.com/licenses/mit/
+channels:
+  setLed:
+    address: openab.{mac}.led
+    messages:
+      ledData:
+        $ref: '#/components/messages/ledData'
+  setEar:
+    address: openab.{mac}.ear
+    messages:
+      ledData:
+        $ref: '#/components/messages/earData'
+  getEar:
+    address: openab.{mac}.ear.user
+    messages:
+      earEventData:
+        $ref: '#/components/messages/earEventData'
+  reboot:
+    address: openab.{mac}.reboot
+  playData:
+    address: openab.{mac}.player.data
+    messages:
+      audio:
+        $ref: '#/components/messages/audioData'
+  playStart:
+    address: openab.{mac}.player.start
+  playLink:
+    address: openab.{mac}.player.link
+    messages:
+      link:
+        $ref: '#/components/messages/linkData'
+  playStop:
+    address: openab.{mac}.player.stop
+  playVol:
+    address: openab.{mac}.player.volume
+    messages:
+      volume:
+        $ref: '#/components/messages/volumeData'
+  recStart:
+    address: openab.{mac}.recorder.start
+  recStop:
+    address: openab.{mac}.recorder.stop
+  recData:
+    address: openab.{mac}.recorder.data
+    messages:
+      audio:
+        $ref: '#/components/messages/audioData'
+  btnSingle:
+    address: openab.{mac}.button.single
+  btnDouble:
+    address: openab.{mac}.button.double
+  btnLstart:
+    address: openab.{mac}.button.lstart
+  btnLstop:
+    address: openab.{mac}.button.lstop
+  btnVol:
+    address: openab.{mac}.button.volume
+    messages:
+      volBtnData:
+        $ref: '#/components/messages/volBtnData'
+  rfid:
+    address: openab.{mac}.rfid
+    messages:
+      rfidData:
+        $ref: '#/components/messages/rfidData'
+  status:
+    address: openab.{mac}.status
+    messages:
+      infoData:
+        $ref: '#/components/messages/infoData'
+    bindings:
+      nats:
+        retain: true
+operations:
+  setLed:
+    action: send
+    channel:
+      $ref: '#/channels/setLed'
+    summary: Set Leds data for a nabaztag
+  setEar:
+    action: send
+    channel:
+      $ref: '#/channels/setEar'
+    summary: Set Ears data for a nabaztag
+  getEar:
+    action: receive
+    channel:
+      $ref: '#/channels/getEar'
+    summary: Ear events sent when the end user manually moves the ears
+  reboot:
+    action: send
+    channel:
+      $ref: '#/channels/reboot'
+    summary: Reboot the device
+  setPlayerData:
+    action: send
+    channel:
+      $ref: '#/channels/playData'
+    summary: Send chunks of audio to the player
+  startPlayer:
+    action: send
+    channel:
+      $ref: '#/channels/playStart'
+    summary: >-
+      Force the player to start (should not be needed), also received when the
+      player actually starts
+  stopPlayer:
+    action: send
+    channel:
+      $ref: '#/channels/playStop'
+    summary: Force the player to stop, also received when the player stops
+  setPlayerLink:
+    action: send
+    channel:
+      $ref: '#/channels/playLink'
+    summary: Send a link to an audio file/stream to play
+  setPlayerVolume:
+    action: send
+    channel:
+      $ref: '#/channels/playVol'
+    summary: Set the player volume
+  getRecorderData:
+    action: receive
+    channel:
+      $ref: '#/channels/recData'
+    summary: Get recorded audio
+  startRecorder:
+    action: send
+    channel:
+      $ref: '#/channels/recStart'
+    summary: Start the recorder
+  stopRecorder:
+    action: send
+    channel:
+      $ref: '#/channels/recStop'
+    summary: Stop the recorder
+  btnSingle:
+    action: receive
+    channel:
+      $ref: '#/channels/btnSingle'
+    summary: Single click on the button
+  btnDouble:
+    action: receive
+    channel:
+      $ref: '#/channels/btnDouble'
+    summary: Double click on the button
+  btnLstart:
+    action: receive
+    channel:
+      $ref: '#/channels/btnLstart'
+    summary: Start of long click on the button
+  btnLstop:
+    action: receive
+    channel:
+      $ref: '#/channels/btnLstop'
+    summary: Stop of long click on the button
+  btnVol:
+    action: receive
+    channel:
+      $ref: '#/channels/btnVol'
+    summary: Volume button/wheel
+  rfid:
+    action: receive
+    channel:
+      $ref: '#/channels/rfid'
+    summary: RFID Tag read
+  status:
+    action: receive
+    channel:
+      $ref: '#/channels/status'
+    summary: When a rabbit connects/disconnects to/from the server
+components:
+  messages:
+    audioData:
+      summary: audio data (for recorder encoded in pcm16)
+      payload:
+        type: string
+        description: raw binary audio data
+    ledData:
+      summary: Nabaztag Led Control
+      description: Led control sequence sent to a nabaztag
+      payload:
+        $ref: '#/components/schemas/ledData'
+    earData:
+      summary: Nabaztag Ear Control
+      description: Ear control sequence sent to a nabaztag
+      payload:
+        $ref: '#/components/schemas/earData'
+    earEventData:
+      summary: Nabaztag Ear Move Event
+      description: Sent when the ear are manually moved by the end user
+      payload:
+        type: object
+        additionalProperties: false
+        properties:
+          id:
+            $ref: '#/components/schemas/earId'
+          position:
+            $ref: '#/components/schemas/earPos'
+    volumeData:
+      summary: Volume data
+      payload:
+        type: integer
+        min: 0
+        max: 255
+    volBtnData:
+      summary: Volume button data
+      payload:
+        type: integer
+        min: 0
+        max: 255
+    linkData:
+      summary: URL
+      payload:
+        type: string
+    rfidData:
+      summary: RFID tag id (hex encoded)
+      payload:
+        type: string
+    infoData:
+      summary: Rabbit status data
+      payload:
+        type: object
+        additionalProperties: false
+        properties:
+          connected:
+            type: boolean
+          hwVersion:
+            type: integer
+            description: Nabaztag version
+            enum:
+              - 1
+              - 2
+              - 3
+          ip:
+            type: string
+          fwVersion:
+            type: string
+            description: firmware version of the nabaztag (rootfs for karotz)
+          swVersion:
+            type: string
+            description: >-
+              version of the software running on the nabaztag (bootcode for
+              tagtag, karotz_rs for karotz)
+        required:
+          - connected
+          - hwVersion
+  schemas:
+    ledData:
+      type: object
+      additionalProperties: false
+      properties:
+        sequence:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              color:
+                type: string
+                description: Led color in hex format (6 digits)
+              duration:
+                type: integer
+                description: duration of the effect (in miliseconds), use 0 to for infinite
+                default: 0
+            required:
+              - color
+        delay:
+          type: integer
+          description: delay before start
+          default: 0
+        id:
+          type: integer
+          description: >-
+            led id (0 for nose or karotz), (1-3 for left to right), (4 for
+            bottom)
+          enum:
+            - 0
+            - 1
+            - 2
+            - 3
+            - 4
+        sync:
+          $ref: '#/components/schemas/sync'
+      required:
+        - id
+        - sequence
+    earData:
+      type: object
+      additionalProperties: false
+      properties:
+        sequence:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              position:
+                $ref: '#/components/schemas/earPos'
+              direction:
+                type: integer
+                description: ear direction (0 for forward, 1 for backwards)
+                default: 0
+                enum:
+                  - 0
+                  - 1
+            required:
+              - color
+        delay:
+          type: integer
+          description: delay before start
+          default: 0
+        id:
+          $ref: '#/components/schemas/earId'
+        sync:
+          $ref: '#/components/schemas/sync'
+      required:
+        - id
+        - sequence
+    earId:
+      type: integer
+      description: ear id (0 for left, 1 for right)
+      enum:
+        - 0
+        - 1
+    earPos:
+      type: integer
+      description: Ear position
+      min: 0
+      max: 16
+    sync:
+      description: >-
+        Sync object that can be used to execue commands (led and ear) at the
+        same time on a device
+      type: object
+      additionalProperties: false
+      properties:
+        count:
+          type: integer
+          description: >-
+            total number of commands expected (data is sent to the device once
+            this number is reached)
+        id:
+          type: string
+          description: id of this sync object, all commands with the same id will be synced
+      required:
+        - count
+        - id
+  parameters:
+    mac:
+      description: MAC Address of the nabaztag (without colons)
