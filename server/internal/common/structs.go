@@ -35,8 +35,8 @@ type NabEarCmd struct {
 }
 
 type NabEarEvent struct {
-	ID       NabButton `json:"id"`
-	Position uint8     `json:"position"`
+	ID       NabEar `json:"id"`
+	Position uint8  `json:"position"`
 }
 
 type NabStatus struct {

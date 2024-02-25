@@ -11,10 +11,10 @@ import (
 	"github.com/droso-hass/openab/internal/utils"
 )
 
-func handleUDP(ch chan udp.UDPPacket) {
+func (n *NabV2) handleUDP(ch chan udp.UDPPacket) {
 	for {
 		data := <-ch
-		nab, ok := conns[data.Addr.IP.String()]
+		nab, ok := n.conns[data.Addr.IP.String()]
 		if !ok {
 			slog.Warn("V2: udp packet received but no handler is associated with this ip", "addr", data.Addr)
 			continue
@@ -31,14 +31,13 @@ func handleUDP(ch chan udp.UDPPacket) {
 				ii := uint8(i)
 				if ii != nab.playLastAck {
 					nab.playLastAck = ii
-					fmt.Printf("ack: %d\n", nab.playLastAck)
 					if nab.playMtxLocked {
 						nab.playMtxLocked = false
 						nab.playMtx.Unlock()
 					}
 				}
 			} else {
-				fmt.Println(err)
+				slog.Warn("V2: error reading ack", utils.ErrAttr(err))
 			}
 		}
 	}

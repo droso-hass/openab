@@ -16,7 +16,7 @@ type INabSender interface {
 	Ear(mac string, data NabEarEvent)
 	Status(mac string, data NabStatus)
 	Rfid(mac string, data string)
-	PlayerState(mac string) // may be changed without user input (ex: when sending data/on data end)
+	PlayerState(mac string, data NabAudio) // may be changed without user input (ex: when sending data/on data end)
 	Button(mac string, data NabButton, value uint8)
 	RecorderData(mac string, data []byte)
 }

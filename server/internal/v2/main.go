@@ -5,139 +5,35 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/droso-hass/openab/internal/common"
 	"github.com/droso-hass/openab/internal/udp"
 	"github.com/droso-hass/openab/internal/utils"
 	"github.com/go-chi/chi/v5"
 )
 
-// http://192.168.1.132/vl
-// locate.jsp ?
-// /vl/bc.jsp
-// /vl/rfid.jsp
-
-// platform: bootcode, locate
-// broad: sounds, choreos
-// ping: rfid, recordings
-
-var conns = map[string]*NabConn{}
-var v2chan chan udp.UDPPacket
-
-func Init(r *chi.Mux) {
-	r.Mount("/vl/bc.jsp", bootcode())
-	v2chan = make(chan udp.UDPPacket)
-	go handleUDP(v2chan)
-	/*
-	   c := *New("127.0.0.1", "")
-	   e := c.Connect()
-
-	   	if e != nil {
-	   		log.Fatal(e)
-	   	}
-
-	   conns["127.0.0.1"] = &c
-	   debug("127.0.0.1")
-	*/
+type NabV2 struct {
+	pub     common.INabSender
+	conns   map[string]*NabConn
+	udpChan chan udp.UDPPacket
 }
 
-func fftest() {
-	ch := make(chan []byte)
-	err := convertPlayer("./static/lisa.mp3", ch, 512)
-	if err != nil {
-		log.Fatal(err)
-	}
-	f, err := os.OpenFile("./static/lisanab.mp3", os.O_WRONLY|os.O_CREATE, 0777)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for {
-		x := <-ch
-		if x == nil {
-			break
-		} else if len(x) > 0 {
-			_, err = f.Write(x)
-			if err != nil {
-				log.Fatal(err)
-			}
-			//time.Sleep(time.Microsecond * 100)
-		}
-	}
-	err = f.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
+func New(r *chi.Mux, snd common.INabSender) NabV2 {
+	v2chan := make(chan udp.UDPPacket)
+	n := NabV2{pub: snd, conns: map[string]*NabConn{}, udpChan: v2chan}
+	go n.handleUDP(v2chan)
+	r.Mount("/vl/bc.jsp", bootcode(&n))
+	return n
 }
 
-func debug(m string) {
-	/*e := conns[m].write("07;2;255")
-	if e != nil {
-		log.Fatal(e)
-	}*/
-
-	/*e := conns[m].write("07;1")
-	if e != nil {
-		log.Fatal(e)
-	}*/
-	e := conns[m].write("00;ping")
-	if e != nil {
-		log.Fatal(e)
-	}
-
-	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:4000", conns[m].ip))
-	if err != nil {
-		log.Fatal(err)
-	}
-	ch := make(chan []byte)
-	err = convertPlayer("./server/static/lisa.mp3", ch, 1024)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var lastPacket []byte = nil
-	for {
-		conns[m].playMtx.Lock()
-		conns[m].playMtxLocked = true
-
-		if lastPacket != nil && conns[m].playLastSent > conns[m].playLastAck {
-			fmt.Printf("-------- %d %d\n", conns[m].playLastSent, conns[m].playLastAck)
-			p := []byte(fmt.Sprintf("%03d", conns[m].playLastSent))
-			// replay last packet
-			udp.Write(udp.UDPPacket{
-				Addr: uaddr,
-				Type: udp.UDPTypeSoundData,
-				Data: append(p, lastPacket...),
-			})
-		} else {
-			conns[m].playLastSent++
-			p := []byte(fmt.Sprintf("%03d", conns[m].playLastSent))
-			for {
-				x := <-ch
-				if x == nil {
-					return
-				} else if l := len(x); l > 0 {
-					lastPacket = x
-					udp.Write(udp.UDPPacket{
-						Addr: uaddr,
-						Type: udp.UDPTypeSoundData,
-						Data: append(p, x...),
-					})
-					break
-				}
-			}
-		}
-		fmt.Println(conns[m].playLastSent)
-	}
-}
-
-func bootcode() http.HandlerFunc {
+func bootcode(n *NabV2) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		slog.Info("new connection from v2", "version", q.Get("v"), "mac", q.Get("m"))
 		utils.SendFile(w, r, "./server/static/nominal.bin", "application/octet-stream")
-		//utils.SendFile(w, r, "./static/bc.jsp", "application/octet-stream")
 
 		go func() {
 			time.Sleep(time.Second * 3)
@@ -146,29 +42,23 @@ func bootcode() http.HandlerFunc {
 			slog.Info("connecting to " + ip)
 
 			// if a connection is already open, close it
-			c, ok := conns[ip]
+			c, ok := n.conns[ip]
 			if ok {
 				c.Disconnect()
 				c.Connect()
 			} else {
-				c := *New(ip, q.Get("m"))
+				c := *NewNab(ip, q.Get("m"), n.pub)
 				err := c.Connect()
 				if err != nil {
 					log.Fatal(err)
 				}
-				conns[ip] = &c
+				n.conns[ip] = &c
 			}
 
-			udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:4000", ip))
-			if err != nil {
-				slog.Error("error parsing udp address", utils.ErrAttr(err))
-			} else {
-				udp.RegisterCallback(udpAddr, v2chan)
-			}
+			udp.RegisterCallback(c.udpAddr, n.udpChan)
 
 			time.Sleep(time.Second * 2)
-			//initseq(ip)
-			debug(ip)
+			//n.initseq(ip)
 
 			reader := bufio.NewReader(os.Stdin)
 			for {
@@ -176,7 +66,7 @@ func bootcode() http.HandlerFunc {
 				if err != nil {
 					log.Fatal(err)
 				}
-				err = conns[ip].write(str)
+				err = n.conns[ip].write(str)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -185,9 +75,9 @@ func bootcode() http.HandlerFunc {
 	}
 }
 
-func initseq(m string) {
+func (n *NabV2) initseq(m string) {
 	green_breath := "03;4;0;00FF00;100;00EE00;100;00DD00;100;00CC00;100;00BB00;100;00AA00;100;009900;100;008800;100;007700;100;006600;100;005500;100;004400;100;003300;100;002200;100;001100;100;000000;100;001100;100;002200;100;003300;100;004400;100;005500;100;006600;100;007700;100;008800;100;009900;100;00AA00;100;00BB00;100;00CC00;100;00DD00;100;00EE00;100"
-	conns[m].write(green_breath + "\n02;0;0;0;1;0\n02;1;0;0;1;0")
+	n.conns[m].write(green_breath + "\n02;0;0;0;1;0\n02;1;0;0;1;0")
 	/*time.Sleep(time.Second * 2)
 	conns[m].write("06;1")
 	time.Sleep(time.Second * 7)

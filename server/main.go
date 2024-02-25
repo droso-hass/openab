@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/droso-hass/openab/internal/api"
+	"github.com/droso-hass/openab/internal/common"
 	"github.com/droso-hass/openab/internal/config"
 	"github.com/droso-hass/openab/internal/udp"
 	"github.com/droso-hass/openab/internal/utils"
@@ -34,7 +36,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	v2.Init(r)
+	api := api.New("nats://127.0.0.1:4222")
+
+	v2.New(r, api)
+	// tagtag
+	api.Listen([]common.INabReceiver{})
 
 	utils.ServeStatic(r, "/data", http.Dir("./static"))
 
