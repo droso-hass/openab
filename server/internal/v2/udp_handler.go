@@ -1,11 +1,8 @@
 package v2
 
 import (
-	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/droso-hass/openab/internal/udp"
 	"github.com/droso-hass/openab/internal/utils"
@@ -53,11 +50,14 @@ func (n *NabConn) handleRecording(rawdata []byte) error {
 		if err != nil {
 			return err
 		}
-		filename := fmt.Sprintf("./server/rec/%s_%d.wav", strings.Replace(n.mac, ":", "", -1), time.Now().Unix())
-		err = utils.WriteFile(filename, filedata)
-		if err != nil {
-			return err
-		}
+		/*
+			filename := fmt.Sprintf("./server/rec/%s_%d.wav", strings.Replace(n.mac, ":", "", -1), time.Now().Unix())
+			err = utils.WriteFile(filename, filedata)
+			if err != nil {
+				return err
+			}
+		*/
+		n.pub.RecorderData(n.mac, filedata)
 		n.recData = []byte{}
 	}
 	n.recData = append(n.recData, rawdata...)

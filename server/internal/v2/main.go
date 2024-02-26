@@ -4,6 +4,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/droso-hass/openab/internal/common"
@@ -38,7 +39,7 @@ func (n *NabV2) FindReceiver(mac string) common.INabReceiver {
 func bootcode(n *NabV2) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		mac := q.Get("m")
+		mac := strings.ReplaceAll(q.Get("m"), ":", "")
 		ip := utils.GetIPFromRequest(r)
 		version := q.Get("v")
 		slog.Info("new connection from v2", "version", version, "mac", mac)
@@ -58,15 +59,16 @@ func (n *NabV2) connectNab(mac string, ip string, fwver string) {
 		c.Disconnect()
 		c.Connect()
 	} else {
-		c := *NewNab(ip, mac, n.pub)
+		c = NewNab(ip, mac, n.pub)
 		err := c.Connect()
 		if err != nil {
 			log.Fatal(err)
 		}
-		n.conns[ip] = &c
+		n.conns[ip] = c
 	}
 	udp.RegisterCallback(c.udpAddr, n.udpChan)
 	go c.playLoop()
+	c.write("00;ping")
 
 	n.pub.Status(mac, common.NabStatus{
 		Connected: true,
