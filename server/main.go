@@ -38,9 +38,9 @@ func main() {
 
 	api := api.New("nats://127.0.0.1:4222")
 
-	v2.New(r, api)
-	// tagtag
-	api.Listen([]common.INabReceiver{})
+	tagtag := v2.New(r, api)
+
+	api.Listen([]common.INabReceiverHander{tagtag})
 
 	utils.ServeStatic(r, "/data", http.Dir("./static"))
 

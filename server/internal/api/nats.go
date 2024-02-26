@@ -11,7 +11,7 @@ import (
 type API struct {
 	nc        *nats.Conn
 	ec        *nats.EncodedConn
-	receivers []common.INabReceiver
+	receivers []common.INabReceiverHander
 }
 
 func New(url string) *API {
@@ -28,11 +28,11 @@ func New(url string) *API {
 	return &API{
 		nc:        nc,
 		ec:        ec,
-		receivers: []common.INabReceiver{},
+		receivers: []common.INabReceiverHander{},
 	}
 }
 
-func (a *API) Listen(receivers []common.INabReceiver) {
+func (a *API) Listen(receivers []common.INabReceiverHander) {
 	a.receivers = receivers
 	a.nc.Subscribe("openab.>", a.processSub)
 }

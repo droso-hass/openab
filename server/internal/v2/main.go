@@ -21,12 +21,21 @@ type NabV2 struct {
 	udpChan chan udp.UDPPacket
 }
 
-func New(r *chi.Mux, snd common.INabSender) NabV2 {
+func New(r *chi.Mux, snd common.INabSender) *NabV2 {
 	v2chan := make(chan udp.UDPPacket)
 	n := NabV2{pub: snd, conns: map[string]*NabConn{}, udpChan: v2chan}
 	go n.handleUDP(v2chan)
 	r.Mount("/vl/bc.jsp", bootcode(&n))
-	return n
+	return &n
+}
+
+func (n *NabV2) FindReceiver(mac string) common.INabReceiver {
+	for _, v := range n.conns {
+		if v.mac == mac {
+			return v
+		}
+	}
+	return nil
 }
 
 func bootcode(n *NabV2) http.HandlerFunc {

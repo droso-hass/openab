@@ -12,6 +12,10 @@ type INabReceiver interface {
 	Reboot(mac string) error
 }
 
+type INabReceiverHander interface {
+	FindReceiver(mac string) INabReceiver
+}
+
 type INabSender interface {
 	Ear(mac string, data NabEarEvent)
 	Status(mac string, data NabStatus)
