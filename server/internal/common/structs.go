@@ -46,3 +46,22 @@ type NabStatus struct {
 	FWVersion string     `json:"fwVersion"`
 	SWVersion string     `json:"swVersion"`
 }
+
+type NabAudioCmd struct {
+	State  NabAudio `json:"state"`
+	Link   string   `json:"link"`
+	Volume uint8    `json:"volume"`
+}
+
+type NabAudioEvent struct {
+	State NabAudio `json:"state"`
+}
+
+type NabRFIDEvent struct {
+	Value string `json:"value"`
+}
+
+type NabButtonEvent struct {
+	ID    NabButton `json:"id"`
+	Value uint8     `json:"value"`
+}

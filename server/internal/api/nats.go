@@ -10,6 +10,7 @@ import (
 
 type API struct {
 	nc        *nats.Conn
+	ec        *nats.EncodedConn
 	receivers []common.INabReceiver
 }
 
@@ -19,8 +20,14 @@ func New(url string) *API {
 		slog.Error("failed to connect to the NATS server")
 		os.Exit(1)
 	}
+	ec, err := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
+	if err != nil {
+		slog.Error("failed to create NATS Encoded connection")
+		os.Exit(1)
+	}
 	return &API{
 		nc:        nc,
+		ec:        ec,
 		receivers: []common.INabReceiver{},
 	}
 }

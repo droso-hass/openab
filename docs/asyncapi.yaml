@@ -23,7 +23,7 @@ channels:
       ledData:
         $ref: '#/components/messages/earData'
   getEar:
-    address: openab.{mac}.ear.user
+    address: openab.{mac}.ear.state
     messages:
       earEventData:
         $ref: '#/components/messages/earEventData'
@@ -34,42 +34,31 @@ channels:
     messages:
       audio:
         $ref: '#/components/messages/audioData'
-  playStart:
-    address: openab.{mac}.player.start
-  playLink:
-    address: openab.{mac}.player.link
+  playState:
+    address: openab.{mac}.player.state
     messages:
-      link:
-        $ref: '#/components/messages/linkData'
-  playStop:
-    address: openab.{mac}.player.stop
-  playVol:
-    address: openab.{mac}.player.volume
+      audio:
+        $ref: '#/components/messages/audioEventData'
+  playCmd:
+    address: openab.{mac}.player.command
     messages:
-      volume:
-        $ref: '#/components/messages/volumeData'
-  recStart:
-    address: openab.{mac}.recorder.start
-  recStop:
-    address: openab.{mac}.recorder.stop
+      audio:
+        $ref: '#/components/messages/audioCmdData'
+  recCmd:
+    address: openab.{mac}.recorder.command
+    messages:
+      audio:
+        $ref: '#/components/messages/audioCmdData'
   recData:
     address: openab.{mac}.recorder.data
     messages:
       audio:
         $ref: '#/components/messages/audioData'
-  btnSingle:
-    address: openab.{mac}.button.single
-  btnDouble:
-    address: openab.{mac}.button.double
-  btnLstart:
-    address: openab.{mac}.button.lstart
-  btnLstop:
-    address: openab.{mac}.button.lstop
-  btnVol:
-    address: openab.{mac}.button.volume
+  button:
+    address: openab.{mac}.button
     messages:
-      volBtnData:
-        $ref: '#/components/messages/volBtnData'
+      buttonData:
+        $ref: '#/components/messages/buttonData'
   rfid:
     address: openab.{mac}.rfid
     messages:
@@ -109,68 +98,31 @@ operations:
     channel:
       $ref: '#/channels/playData'
     summary: Send chunks of audio to the player
-  startPlayer:
+  setPlayer:
     action: send
     channel:
-      $ref: '#/channels/playStart'
-    summary: >-
-      Force the player to start (should not be needed), also received when the
-      player actually starts
-  stopPlayer:
+      $ref: '#/channels/playCmd'
+    summary: Commands sent to the player
+  getPlayerEvents:
     action: send
     channel:
-      $ref: '#/channels/playStop'
-    summary: Force the player to stop, also received when the player stops
-  setPlayerLink:
-    action: send
-    channel:
-      $ref: '#/channels/playLink'
-    summary: Send a link to an audio file/stream to play
-  setPlayerVolume:
-    action: send
-    channel:
-      $ref: '#/channels/playVol'
-    summary: Set the player volume
+      $ref: '#/channels/playState'
+    summary: Events changes sent by the player
   getRecorderData:
     action: receive
     channel:
       $ref: '#/channels/recData'
     summary: Get recorded audio
-  startRecorder:
+  setRecorder:
     action: send
     channel:
-      $ref: '#/channels/recStart'
-    summary: Start the recorder
-  stopRecorder:
-    action: send
-    channel:
-      $ref: '#/channels/recStop'
-    summary: Stop the recorder
-  btnSingle:
+      $ref: '#/channels/recCmd'
+    summary: Start/stop the recorder
+  getButton:
     action: receive
     channel:
-      $ref: '#/channels/btnSingle'
-    summary: Single click on the button
-  btnDouble:
-    action: receive
-    channel:
-      $ref: '#/channels/btnDouble'
-    summary: Double click on the button
-  btnLstart:
-    action: receive
-    channel:
-      $ref: '#/channels/btnLstart'
-    summary: Start of long click on the button
-  btnLstop:
-    action: receive
-    channel:
-      $ref: '#/channels/btnLstop'
-    summary: Stop of long click on the button
-  btnVol:
-    action: receive
-    channel:
-      $ref: '#/channels/btnVol'
-    summary: Volume button/wheel
+      $ref: '#/channels/button'
+    summary: Get button events
   rfid:
     action: receive
     channel:
@@ -188,6 +140,36 @@ components:
       payload:
         type: string
         description: raw binary audio data
+    audioCmdData:
+      summary: Player/Recorder status data
+      payload:
+        type: object
+        additionalProperties: false
+        properties:
+          state:
+            type: integer
+            description: "0 if stopped, 1 if playing"
+            enum:
+              - 0
+              - 1
+          link:
+            type: string
+          volume:
+            type: integer
+            min: 0
+            max: 255
+    audioEventData:
+      summary: Audio Event Data
+      payload:
+        type: object
+        additionalProperties: false
+        properties:
+          state:
+            type: integer
+            description: "0 if stopped, 1 if playing"
+            enum:
+              - 0
+              - 1
     ledData:
       summary: Nabaztag Led Control
       description: Led control sequence sent to a nabaztag
@@ -209,26 +191,33 @@ components:
             $ref: '#/components/schemas/earId'
           position:
             $ref: '#/components/schemas/earPos'
-    volumeData:
-      summary: Volume data
+    buttonData:
+      summary: Button data
       payload:
-        type: integer
-        min: 0
-        max: 255
-    volBtnData:
-      summary: Volume button data
-      payload:
-        type: integer
-        min: 0
-        max: 255
-    linkData:
-      summary: URL
-      payload:
-        type: string
+        type: object
+        additionalProperties: false
+        properties:
+          id:
+            type: integer
+            description: "0: single click, 1: double, 2: long start, 3: long stop, 4: volume"
+            enum:
+              - 0
+              - 1
+              - 2
+              - 3
+              - 4
+          value:
+            type: integer
+            min: 0
+            max: 255
     rfidData:
       summary: RFID tag id (hex encoded)
       payload:
-        type: string
+        type: object
+        additionalProperties: false
+        properties:
+          value:
+            type: string
     infoData:
       summary: Rabbit status data
       payload:

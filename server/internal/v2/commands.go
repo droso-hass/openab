@@ -60,6 +60,6 @@ out:
 		// if not yet playing, force start the player
 		n.write("07;1")
 		n.isPlaying.Store(true)
-		n.pub.PlayerState(n.mac, common.NabAudioRunning)
+		n.pub.PlayerState(n.mac, common.NabAudioEvent{State: common.NabAudioRunning})
 	}
 }
