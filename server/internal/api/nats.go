@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/droso-hass/openab/internal/common"
+	"github.com/droso-hass/openab/internal/config"
 	"github.com/nats-io/nats.go"
 )
 
@@ -12,10 +13,18 @@ type API struct {
 	nc        *nats.Conn
 	ec        *nats.EncodedConn
 	receivers []common.INabReceiverHander
+	syncCmds  map[string]common.NabSyncedItems
 }
 
 func New(url string) *API {
-	nc, err := nats.Connect(url, nats.Name("openab server"))
+	opts := []nats.Option{
+		nats.Name(config.ConfigData.ClientID),
+	}
+	if config.ConfigData.NatsUsername != "" && config.ConfigData.NatsPassword != "" {
+		opts = append(opts, nats.UserInfo(config.ConfigData.NatsUsername, config.ConfigData.NatsPassword))
+	}
+	nc, err := nats.Connect(config.ConfigData.NatsServer, opts...)
+
 	if err != nil {
 		slog.Error("failed to connect to the NATS server")
 		os.Exit(1)
@@ -29,6 +38,7 @@ func New(url string) *API {
 		nc:        nc,
 		ec:        ec,
 		receivers: []common.INabReceiverHander{},
+		syncCmds:  map[string]common.NabSyncedItems{},
 	}
 }
 

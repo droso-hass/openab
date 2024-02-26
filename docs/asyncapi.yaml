@@ -148,10 +148,10 @@ components:
         properties:
           state:
             type: integer
-            description: "0 if stopped, 1 if playing"
+            description: "1 if stopped, 2 if playing"
             enum:
-              - 0
               - 1
+              - 2
           link:
             type: string
           volume:
@@ -166,10 +166,10 @@ components:
         properties:
           state:
             type: integer
-            description: "0 if stopped, 1 if playing"
+            description: "1 if stopped, 2 if playing"
             enum:
-              - 0
               - 1
+              - 2
     ledData:
       summary: Nabaztag Led Control
       description: Led control sequence sent to a nabaztag
@@ -305,6 +305,10 @@ components:
                 enum:
                   - 0
                   - 1
+              duration:
+                type: integer
+                description: delay until next effect (in miliseconds), use 0 to for none
+                default: 0
             required:
               - color
         delay:

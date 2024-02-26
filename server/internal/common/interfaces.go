@@ -1,15 +1,13 @@
 package common
 
 type INabReceiver interface {
-	SyncPacket(mac string, data NabSyncedItems) error
-	Led(mac string, data NabLedCmd) error
-	Ear(mac string, data NabEar) error
-	RecorderState(mac string, data NabAudio) error
-	PlayerState(mac string, data NabAudio) error
-	PlayLink(mac string, url string) error
-	PlayerVolume(mac string, data uint8) error
-	PlayerData(mac string, data []byte) error
-	Reboot(mac string) error
+	SyncPacket(data NabSyncedItems) error
+	Led(data NabLedCmd) error
+	Ear(data NabEarCmd) error
+	Player(data NabAudioCmd) error
+	Recorder(data NabAudioCmd) error
+	PlayerData(data []byte) error
+	Reboot() error
 }
 
 type INabReceiverHander interface {

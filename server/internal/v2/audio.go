@@ -88,7 +88,7 @@ func convertRecording(in []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func convertPlayer(input string, ch chan []byte, chunkSize int) error {
+func convertPlayerFile(input string, ch chan []byte, chunkSize int) error {
 	// ffmpeg -i in.wav -vn -ar 44100 -ac 1 -b:a 64k out.mp3
 	cmd := exec.Command("ffmpeg",
 		"-hide_banner", "-loglevel", "error",
@@ -123,4 +123,44 @@ func convertPlayer(input string, ch chan []byte, chunkSize int) error {
 	}()
 	go cmd.Wait()
 	return nil
+}
+
+func convertPlayerChunk(input []byte) ([]byte, error) {
+	// ffmpeg -i in.wav -vn -ar 44100 -ac 1 -b:a 64k out.mp3
+	cmd := exec.Command("ffmpeg",
+		"-hide_banner", "-loglevel", "error",
+		"-i", "pipe:0",
+		"-vn",
+		"-ar", "44100",
+		"-ac", "1",
+		"-b:a", "64k",
+		"-f", "mp3",
+		"pipe:1",
+	)
+
+	out := new(bytes.Buffer)
+
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = out
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	_, err = stdin.Write(input)
+	if err != nil {
+		return nil, err
+	}
+	err = stdin.Close()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }

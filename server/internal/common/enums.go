@@ -1,32 +1,10 @@
 package common
 
-type MsgType uint8
-
-const (
-	MsgTypePlay         MsgType = 0
-	MsgTypePlayStart    MsgType = 1
-	MsgTypePlayStop     MsgType = 2
-	MsgTypeVolume       MsgType = 3
-	MsgTypeRecordStart  MsgType = 4
-	MsgTypeRecordStop   MsgType = 5
-	MsgTypeSetEar       MsgType = 6
-	MsgTypeEarData      MsgType = 7
-	MsgTypeSetLed       MsgType = 8
-	MsgTypeGetImage     MsgType = 9
-	MsgTypeImageData    MsgType = 10
-	MsgTypeReboot       MsgType = 11
-	MsgTypeConnected    MsgType = 12 // mac, version
-	MsgTypeDisconnected MsgType = 13
-	MsgTypeButton       MsgType = 14 // type (short, double, long) + (value for wheel)
-	MsgTypeRfid         MsgType = 15
-	MsgTypeRecordData   MsgType = 16
-)
-
 type NabAudio uint8
 
 const (
-	NabAudioStopped = 0
-	NabAudioRunning = 1
+	NabAudioStopped = 1
+	NabAudioRunning = 2
 )
 
 type NabButton uint8

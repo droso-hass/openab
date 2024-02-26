@@ -24,6 +24,7 @@ type NabConn struct {
 	playLastSent  uint8
 	playLastAck   uint8
 	isPlaying     atomic.Bool
+	playChan      chan []byte
 }
 
 func NewNab(ip string, mac string, pub common.INabSender) *NabConn {
@@ -43,6 +44,7 @@ func NewNab(ip string, mac string, pub common.INabSender) *NabConn {
 		playLastSent:  0,
 		playLastAck:   0,
 		isPlaying:     atomic.Bool{},
+		playChan:      make(chan []byte, 100),
 	}
 	return &n
 }

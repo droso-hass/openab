@@ -1,18 +1,19 @@
 package common
 
 type NabSyncedItems struct {
-	Led []NabLedCmd
-	Ear []NabEarCmd
+	Led   []NabLedCmd
+	Ear   []NabEarCmd
+	Count int
 }
 
 type NabSync struct {
-	Count int `json:"count"`
-	ID    int `json:"id"`
+	Count int    `json:"count"`
+	ID    string `json:"id"`
 }
 
 type NabLedItem struct {
 	Color    string `json:"color"`
-	Duration int    `json:"duration"`
+	Duration uint   `json:"duration"`
 }
 
 type NabLedCmd struct {
@@ -25,13 +26,14 @@ type NabLedCmd struct {
 type NabEarItem struct {
 	Position  uint8 `json:"position"`
 	Direction uint8 `json:"direction"`
+	Duration  uint  `json:"duration"`
 }
 
 type NabEarCmd struct {
-	Delay    int        `json:"delay"`
-	ID       NabEar     `json:"id"`
-	Sequence NabEarItem `json:"sequence"`
-	Sync     NabSync    `json:"sync"`
+	Delay    int          `json:"delay"`
+	ID       NabEar       `json:"id"`
+	Sequence []NabEarItem `json:"sequence"`
+	Sync     NabSync      `json:"sync"`
 }
 
 type NabEarEvent struct {
