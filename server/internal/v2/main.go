@@ -67,7 +67,6 @@ func (n *NabV2) connectNab(mac string, ip string, fwver string) {
 		n.conns[ip] = c
 	}
 	udp.RegisterCallback(c.udpAddr, n.udpChan)
-	go c.playLoop()
 	c.write("00;ping")
 
 	n.pub.Status(mac, common.NabStatus{

@@ -65,6 +65,7 @@ func (n *NabConn) Player(data common.NabAudioCmd) error {
 	if data.State == common.NabAudioRunning {
 		return n.write("07;1")
 	} else if data.State == common.NabAudioStopped {
+		n.stopPlayer()
 		return n.write("07;0")
 	}
 

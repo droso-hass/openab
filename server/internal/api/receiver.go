@@ -88,6 +88,11 @@ func (a *API) processSub(m *nats.Msg) {
 			}
 		} else if sp[3] == "data" {
 			err = recv.PlayerData(m.Data)
+			if err != nil {
+				m.Respond([]byte(err.Error()))
+			} else {
+				m.Respond(nil)
+			}
 		}
 	case "recorder":
 		if sp[3] == "command" {

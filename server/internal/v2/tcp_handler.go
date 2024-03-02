@@ -7,8 +7,6 @@ import (
 	"github.com/droso-hass/openab/internal/common"
 )
 
-var RecDataSize = 4096
-
 func (n *NabConn) processNabMessage(data []byte) {
 	sdata := string(data)
 	fmt.Println(sdata)
@@ -30,6 +28,7 @@ func (n *NabConn) processNabMessage(data []byte) {
 			n.isPlaying.Store(true)
 			n.pub.PlayerState(n.mac, common.NabAudioEvent{State: common.NabAudioRunning})
 		} else if sdata[3:4] == "0" {
+			n.isPlaying.Store(false)
 			n.pub.PlayerState(n.mac, common.NabAudioEvent{State: common.NabAudioStopped})
 		}
 	case "09":

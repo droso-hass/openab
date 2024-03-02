@@ -13,7 +13,7 @@ func ServeStatic(r chi.Router, serverRoute string, pathToStaticFolder http.FileS
 	}
 
 	if serverRoute != "/" && serverRoute[len(serverRoute)-1] != '/' {
-		r.Get(serverRoute, http.RedirectHandler(serverRoute+"/", 301).ServeHTTP)
+		r.Get(serverRoute, http.RedirectHandler(serverRoute+"/", http.StatusMovedPermanently).ServeHTTP)
 		serverRoute += "/"
 	}
 	serverRoute += "*"

@@ -16,7 +16,6 @@ type NabConn struct {
 	udpAddr *net.UDPAddr
 	conn    net.Conn
 	stop    bool
-	recData []byte
 	pub     common.INabSender
 	// player
 	playMtx       sync.Mutex
@@ -24,7 +23,12 @@ type NabConn struct {
 	playLastSent  uint8
 	playLastAck   uint8
 	isPlaying     atomic.Bool
-	playChan      chan []byte
+	playChanIn    chan []byte
+	playChanOut   chan []byte
+	// recorder
+	recData []byte
+	//recChanIn  chan []byte
+	//recChanOut chan []byte
 }
 
 func NewNab(ip string, mac string, pub common.INabSender) *NabConn {
@@ -44,7 +48,6 @@ func NewNab(ip string, mac string, pub common.INabSender) *NabConn {
 		playLastSent:  0,
 		playLastAck:   0,
 		isPlaying:     atomic.Bool{},
-		playChan:      make(chan []byte, 100),
 	}
 	return &n
 }
