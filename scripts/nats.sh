@@ -1,0 +1,1 @@
+docker run -it --name nats --rm -p 4222:4222 nats

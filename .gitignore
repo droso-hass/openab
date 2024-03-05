@@ -5,3 +5,8 @@ doc
 *.wav
 *.mp3
 *.mp4
+run.sh
+testr.py
+node_modules
+wyoming-satellite
+__pycache__
