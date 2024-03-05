@@ -13,6 +13,13 @@ Ports:
 v2 TODO:
 - Implement button long click
 - Fix ear positionning
+- Fix player
+
+Global TODO:
+- V3 Implementation
+- V1 Implementation
+- API Stabilization
+- Home Assistant Integration
 
 ### Testing the voice satellite (highly experimental and hacky)
 
