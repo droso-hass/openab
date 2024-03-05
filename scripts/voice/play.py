@@ -11,6 +11,10 @@ async def main():
 
     print("Player Connected")
 
+    async def blank():
+        for i in range(30):
+            await send(b'0'*1024)
+
     async def send(audio):
         inbox = nc.new_inbox()
         sub = await nc.subscribe(inbox)
@@ -31,6 +35,7 @@ async def main():
                 if not was_streaming:
                     # stop the recorder while we send audio
                     await nc.publish(f"openab.{cfg.MAC}.recorder.command", bytes(json.dumps({"state": 1}), "utf8"))
+                    await blank()
                 was_streaming = True
                 lastread = time()
                 data += r
@@ -38,10 +43,11 @@ async def main():
                     await send(data)
                     data = b''
             elif was_streaming:
-                if time()-lastread > 2:
+                if time()-lastread > 1:
                     print("End of stream")
                     if len(data) > 0:
                         await send(data)
+                    await blank()
                     was_streaming = False
                     break
         except BlockingIOError:
