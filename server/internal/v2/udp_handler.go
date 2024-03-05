@@ -46,7 +46,7 @@ func (n *NabConn) handleRecording(rawdata []byte) error {
 		if err != nil {
 			return err
 		}
-		filedata, err := convertRecording(wav)
+		filedata, err := utils.FFconvertChunkNoWait(utils.FFadpcmToPCM, wav)
 		if err != nil {
 			return err
 		}

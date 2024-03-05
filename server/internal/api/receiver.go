@@ -24,6 +24,7 @@ func (a *API) processSub(m *nats.Msg) {
 	sp := strings.Split(m.Subject, ".")
 	recv := a.getReceiver(sp[1])
 	if recv == nil {
+		slog.Warn("receiver not found for mac address", "mac", sp[1])
 		return
 	}
 	var err error
