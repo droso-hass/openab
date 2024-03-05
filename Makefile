@@ -21,4 +21,5 @@ v2-simu: v2-metalc tagtag/src*
 	cd tagtag/mtl_linux && ./mtl_simu --dologtime --logs init,vm,simunet,simuleds,simuaudio
 
 run: all
-	./server/openab
+	sudo ./server/openab --log-level=debug --nats-server="nats://localhost:4222" --nats-user="openab" --nats-password="1234"
+

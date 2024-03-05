@@ -29,6 +29,7 @@ fun requestAudio =
     writeudpconn strcatlist "ssd"::(itoa packet_cpt)::nil;;
 
 fun wavcb i =
+    /*
     led 1 0x000000;
     led 2 0x000000;
     led 3 0x000000;
@@ -41,6 +42,7 @@ fun wavcb i =
     if buf_size > 100000 then (
         led 3 0x00FF00
     );
+    */
 	let hd audio_fifo -> sample in
     (
         if sample == nil then (
@@ -81,7 +83,7 @@ fun playerUDPHandler data =
         set buf_size = buf_size + strlen dt;
         set audio_fifo=conc audio_fifo dt::nil;
         if buf_size >= WAV_BUFFER_STARTSIZE && isPlaying == 0 then (
-            led 0 0x00FFFF;
+            //led 0 0x00FFFF;
             // signal that player is auto started
             writetcpconn "07;1";
             startPlayer

@@ -42,7 +42,7 @@ fun mainSetup =
     Secholn "test";;
 
 fun mainLoop = 
-    //ledLoop;
+    ledLoop;
     earLoop;
     buttonLoop;
     rfidLoop;
