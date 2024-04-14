@@ -10,11 +10,10 @@ const (
 type NabButton uint8
 
 const (
-	NabButtonShort     NabButton = 0
-	NabButtonDouble    NabButton = 1
-	NabButtonLongStart NabButton = 2
-	NabButtonLongEnd   NabButton = 3
-	NabButtonVolume    NabButton = 4
+	NabButtonShort  NabButton = 0
+	NabButtonDouble NabButton = 1
+	NabButtonLong   NabButton = 2
+	NabButtonVolume NabButton = 3
 )
 
 type NabLed uint8

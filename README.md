@@ -13,7 +13,6 @@ Ports:
 - udp/4000: For V2 (to send/receive audio)
 
 v2 TODO:
-- Implement button long click
 - Fix ear positionning
 - Fix player
 

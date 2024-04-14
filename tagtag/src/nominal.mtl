@@ -1888,6 +1888,7 @@ type Button=[last_time last_state reported nbclick];;
 var btn;;
 var wheel;;
 var lastRfid;;
+var LONG_CLICK_TIME = 600;;
 
 fun eventsInit = 
     set lastRfid = 0;
@@ -1907,12 +1908,14 @@ fun buttonLoop =
     
     let button2 -> b in (
         if b != btn.last_state then (
-            if b == 0 then 
+            if btn.last_state == 1 && btn.reported == 1 then
+                set btn = [last_time: time_ms last_state: 0 reported: 1 nbclick: 0]
+            else if b == 0 then 
                 set btn = [last_time: time_ms last_state: b reported: 0 nbclick: btn.nbclick]
             else
                 set btn = [last_time: time_ms last_state: b reported: 0 nbclick: btn.nbclick+1]
         ) else if btn.reported == 0 && btn.last_time + 500 < time_ms then (
-            if btn.last_state == 1 && btn.last_time + 600 < time_ms then (
+            if btn.last_state == 1 && btn.last_time + LONG_CLICK_TIME < time_ms then (
                 writetcpconn "04;3"; // long click
                 set btn = [last_time: time_ms last_state: 1 reported: 1 nbclick: 0]
             )

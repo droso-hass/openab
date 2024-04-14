@@ -17,9 +17,7 @@ func (n *NabConn) processNabMessage(data []byte) {
 		} else if sdata[3:4] == "2" {
 			n.pub.Button(n.mac, common.NabButtonEvent{ID: common.NabButtonDouble})
 		} else if sdata[3:4] == "3" {
-			n.pub.Button(n.mac, common.NabButtonEvent{ID: common.NabButtonLongStart})
-		} else if sdata[3:4] == "4" {
-			n.pub.Button(n.mac, common.NabButtonEvent{ID: common.NabButtonLongEnd})
+			n.pub.Button(n.mac, common.NabButtonEvent{ID: common.NabButtonLong})
 		}
 	case "05":
 		n.pub.Rfid(n.mac, common.NabRFIDEvent{Value: sdata[3:]})

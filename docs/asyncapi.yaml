@@ -199,13 +199,12 @@ components:
         properties:
           id:
             type: integer
-            description: "0: single click, 1: double, 2: long start, 3: long stop, 4: volume"
+            description: "0: single click, 1: double, 2: long, 3: volume"
             enum:
               - 0
               - 1
               - 2
               - 3
-              - 4
           value:
             type: integer
             min: 0
